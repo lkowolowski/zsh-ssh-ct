@@ -1,0 +1,81 @@
+# .pre-commit-config.yaml
+# https://pre-commit.com
+#
+# Install:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run manually:
+#   pre-commit run --all-files
+
+repos:
+  # ── Standard file hygiene ─────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--unsafe] # allows YAML anchors
+      - id: check-added-large-files
+        args: [--maxkb=100]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ── ShellCheck — static analysis for shell scripts ───────────────────────
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        name: shellcheck (zsh files)
+        types: [] # override default type filter
+        files: '\.(zsh)$'
+        args:
+          - --severity=warning # error + warning; style is informational only
+          - --color=always
+
+  # ── zsh -n syntax check ───────────────────────────────────────────────────
+  # Catches zsh-specific syntax errors that shellcheck (bash mode) misses.
+  - repo: local
+    hooks:
+      - id: zsh-syntax-check
+        name: zsh syntax check
+        language: system
+        entry: bash -c 'for f in "$@"; do zsh -n "$f" || exit 1; done' --
+        types: []
+        files: '\.(zsh)$'
+        pass_filenames: true
+
+  # ── yamllint — YAML style and syntax ─────────────────────────────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yml]
+        files: '\.(yml|yaml)$'
+
+  # ── markdownlint — Markdown style ────────────────────────────────────────
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.yml]
+
+  # ── checkmake — Makefile linter ──────────────────────────────────────────
+  # Built in pre-commit's sandbox — no system install required.
+  - repo: https://github.com/checkmake/checkmake.git
+    rev: v0.3.0
+    hooks:
+      - id: checkmake
+
+  # ── All linting — delegated to make lint ─────────────────────────────────
+  - repo: local
+    hooks:
+      - id: make-lint
+        name: make lint
+        language: system
+        entry: make lint
+        pass_filenames: false
+        always_run: true
