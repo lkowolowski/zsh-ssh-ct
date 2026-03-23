@@ -1,13 +1,13 @@
 # zsh-ssh-ct
 
-A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output, fuzzy host matching, automatic retry with a single-line animated status display, host/profile caching with TTL, and rich tab completion.
+A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output, fuzzy host matching, automatic retry with a single-line status display, host/profile caching with TTL, and rich tab completion.
 
 ---
 
 ## Features
 
 - **Profile-based ct configs** — `-j` Juniper, `-c` Cisco, `-p` PAN-OS, `-u` Unix
-- **Ping-before-connect retry loop** — waits up to 60 × 30s for a host to come up; each failed attempt adds a red ✗ to a single status line with a live countdown, keeping output compact
+- **Ping-before-connect retry loop** — waits up to 60 × 30s for a host to come up; each failed attempt appends a red ✗ to a single status line, replaced with a green ✓ on success
 - **Fuzzy host matching** — resolves partial names against `/etc/hosts`, `~/.ssh/known_hosts`, `~/.ssh/config`, and the local cache
 - **Exact hostname override** — `-H <host>` bypasses fuzzy matching entirely
 - **Fuzzy confirmation prompt** — opt-in prompt before connecting to a fuzzy-matched host
@@ -112,20 +112,20 @@ best scoring candidate from your known hosts / cache.
 
 Set any of these in your `.zshrc` **before** the `source` / `zgenom load` line:
 
-| Variable              | Default                     | Description                                                   |
-| --------------------- | --------------------------- | ------------------------------------------------------------- |
-| `_SSH_CT_CONFIG_DIR`  | `~/.local/chromaterm`       | Directory containing ct YAML files                            |
-| `_SSH_CACHE_FILE`     | `~/.cache/zsh-ssh-ct/hosts` | Host cache file path                                          |
-| `_SSH_MAX_RETRIES`    | `60`                        | Maximum ping retry iterations                                 |
-| `_SSH_RETRY_SLEEP`    | `30`                        | Seconds between retries                                       |
-| `_SSH_CACHE_TTL_DAYS` | `30`                        | Days before cache entries expire (`0` = forever)              |
-| `_SSH_FUZZY_CONFIRM`  | `0`                         | Set to `1` to prompt before connecting to fuzzy-matched hosts |
+| Variable              | Default                       | Description                                                                               |
+| --------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `_SSH_CT_CONFIG_DIR`  | `$XDG_CONFIG_HOME/chromaterm` | Directory containing ct YAML files (`~/.config/chromaterm` if `XDG_CONFIG_HOME` is unset) |
+| `_SSH_CACHE_FILE`     | `~/.cache/zsh-ssh-ct/hosts`   | Host cache file path                                                                      |
+| `_SSH_MAX_RETRIES`    | `60`                          | Maximum ping retry iterations                                                             |
+| `_SSH_RETRY_SLEEP`    | `30`                          | Seconds between retries                                                                   |
+| `_SSH_CACHE_TTL_DAYS` | `30`                          | Days before cache entries expire (`0` = forever)                                          |
+| `_SSH_FUZZY_CONFIRM`  | `0`                           | Set to `1` to prompt before connecting to fuzzy-matched hosts                             |
 
 ### Example `.zshrc`
 
 ```zsh
 # Overrides — must precede the source/load line
-export _SSH_CT_CONFIG_DIR="${HOME}/.local/chromaterm"
+export _SSH_CT_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
 export _SSH_CACHE_TTL_DAYS=7
 export _SSH_FUZZY_CONFIRM=1
 export _SSH_MAX_RETRIES=10
@@ -160,8 +160,8 @@ bundled configs in `ct/` are provided as a starting point — copy or symlink
 them there and customise as needed:
 
 ```zsh
-mkdir -p ~/.local/chromaterm
-cp ~/.zsh/zsh-ssh-ct/ct/*.yml ~/.local/chromaterm/
+mkdir -p "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
+cp ~/.zsh/zsh-ssh-ct/ct/*.yml "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm/"
 ```
 
 | File          | Device type                |
