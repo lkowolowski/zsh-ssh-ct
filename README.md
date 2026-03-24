@@ -27,11 +27,8 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 
 ## Prerequisite
 
-Pick one
-
 ```sh
-#pip3 install chromaterm
-uv tool install chromaterm
+pip3 install chromaterm
 ```
 
 ---
@@ -42,20 +39,20 @@ uv tool install chromaterm
 
 ```zsh
 # In your .zshrc zgenom save block:
-zgenom load lkowolowski/zsh-ssh-ct
+zgenom load <yourgithubuser>/zsh-ssh-ct
 ```
 
 ### zinit
 
 ```zsh
-zinit light lkowolowski/zsh-ssh-ct
+zinit light <yourgithubuser>/zsh-ssh-ct
 ```
 
 ### Oh My Zsh
 
 ```zsh
 # Clone into OMZ custom plugins directory
-git clone https://github.com/lkowolowski/zsh-ssh-ct \
+git clone https://github.com/<yourgithubuser>/zsh-ssh-ct \
     "${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}/plugins/zsh-ssh-ct"
 
 # Add to plugins list in ~/.zshrc
@@ -66,7 +63,7 @@ plugins=(... zsh-ssh-ct)
 
 ```zsh
 # 1. Clone the repo
-git clone https://github.com/lkowolowski/zsh-ssh-ct ~/.zsh/zsh-ssh-ct
+git clone https://github.com/<yourgithubuser>/zsh-ssh-ct ~/.zsh/zsh-ssh-ct
 
 # 2. Add to ~/.zshrc — config overrides MUST come before the source line
 #    (see Configuration section below)
@@ -136,7 +133,7 @@ export _SSH_RETRY_SLEEP=15
 
 # Plugin load (choose one)
 source ~/.zsh/zsh-ssh-ct/zsh-ssh-ct.plugin.zsh   # manual
-# zgenom load lkowolowski/zsh-ssh-ct         # zgenom
+# zgenom load <yourgithubuser>/zsh-ssh-ct         # zgenom
 ```
 
 ---
@@ -155,11 +152,25 @@ The cache is also auto-pruned silently in the background at most once per day.
 
 ---
 
-## ct profiles
+## Bundled ct configs
 
-I have some profiles at
-[lkowolowski/ct-highlight](https://github.com/lkowolowski/ct-highlight) for my
-commonly used ssh sessions.
+The `ct/` directory contains starter highlight rules for each profile. By
+default the plugin looks in `~/.local/chromaterm/` for your YAML files. The
+bundled configs in `ct/` are provided as a starting point — copy or symlink
+them there and customise as needed:
+
+```zsh
+mkdir -p "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
+cp ~/.zsh/zsh-ssh-ct/ct/*.yml "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm/"
+```
+
+| File          | Device type                                               |
+| ------------- | --------------------------------------------------------- |
+| `generic.yml` | Catch-all — used when no profile-specific config is found |
+| `juniper.yml` | Juniper JunOS                                             |
+| `cisco.yml`   | Cisco IOS / IOS-XE / NX-OS                                |
+| `panos.yml`   | Palo Alto PAN-OS                                          |
+| `unix.yml`    | Linux / Unix                                              |
 
 ---
 
