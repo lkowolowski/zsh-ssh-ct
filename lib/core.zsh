@@ -264,11 +264,17 @@ _ssh() {
         return 1
     fi
 
-    # ── Resolve ct config ─────────────────────────────────────────────────────
+    # ── Resolve ct config — fall back to generic.yml if profile file missing ────
     local ct_config="${_SSH_CT_CONFIG_DIR}/${yaml_file}"
+    local ct_generic="${_SSH_CT_CONFIG_DIR}/generic.yml"
     if [[ ! -f "${ct_config}" ]]; then
-        echo "[_ssh] Warning: ct config not found at '${ct_config}'. Using ct default." >&2
-        ct_config=""
+        if [[ -f "${ct_generic}" ]]; then
+            echo "[_ssh] Warning: '${yaml_file}' not found — falling back to generic.yml." >&2
+            ct_config="${ct_generic}"
+        else
+            echo "[_ssh] Warning: '${yaml_file}' not found and no generic.yml. Using ct default." >&2
+            ct_config=""
+        fi
     fi
 
     # ── Detect bare IP addresses — treat like -H (skip fuzzy matching) ───────
@@ -373,8 +379,7 @@ _ssh() {
             local -i exit_code=$?
 
             if (( exit_code == 255 )); then
-
-                       echo "[_ssh] SSH connection failed (exit 255)." >&2
+                echo "[_ssh] SSH connection failed (exit 255)." >&2
             fi
             return "${exit_code}"
         fi
