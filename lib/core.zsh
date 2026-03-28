@@ -200,12 +200,9 @@ EOF
 # Core _ssh function
 # ---------------------------------------------------------------------------
 _ssh() {
-    # ── Guard: ct must be available ──────────────────────────────────────────
-    if ! command -v ct &>/dev/null; then
-        echo "[_ssh] Error: 'ct' (ChromaTerm) not found in \$PATH." >&2
-        echo "[_ssh] Install with: pip3 install chromaterm" >&2
-        return 1
-    fi
+    # ── ct is optional — fall back to plain ssh if not installed ─────────────
+    local ct_available=0
+    command -v ct &>/dev/null && ct_available=1
 
     # ── Parse arguments ───────────────────────────────────────────────────────
     local profile_flag="" verbose_flag="" exact_host="" dry_run=0
@@ -258,22 +255,19 @@ _ssh() {
     # -H overrides positional host
     [[ -n "${exact_host}" ]] && host="${exact_host}"
 
-    local yaml_file="${_SSH_PROFILE_MAP[$profile_flag]}"
-    if [[ -z "${yaml_file}" ]]; then
-        echo "[_ssh] Error: unknown profile flag '-${profile_flag}'." >&2
-        return 1
-    fi
-
     # ── Resolve ct config — fall back to generic.yml if profile file missing ────
-    local ct_config="${_SSH_CT_CONFIG_DIR}/${yaml_file}"
-    local ct_generic="${_SSH_CT_CONFIG_DIR}/generic.yml"
-    if [[ ! -f "${ct_config}" ]]; then
-        if [[ -f "${ct_generic}" ]]; then
+    local ct_config=""
+    if (( ct_available )); then
+        local yaml_file="${_SSH_PROFILE_MAP[$profile_flag]}"
+        local ct_profile="${_SSH_CT_CONFIG_DIR}/${yaml_file}"
+        local ct_generic="${_SSH_CT_CONFIG_DIR}/generic.yml"
+        if [[ -f "${ct_profile}" ]]; then
+            ct_config="${ct_profile}"
+        elif [[ -f "${ct_generic}" ]]; then
             echo "[_ssh] Warning: '${yaml_file}' not found — falling back to generic.yml." >&2
             ct_config="${ct_generic}"
         else
-            echo "[_ssh] Warning: '${yaml_file}' not found and no generic.yml. Using ct default." >&2
-            ct_config=""
+            echo "[_ssh] Warning: no ct config found. Using ct default." >&2
         fi
     fi
 
@@ -317,15 +311,23 @@ _ssh() {
 
     # ── Show resolved ct config path ──────────────────────────────────────────
     local ct_config_display
-    [[ -n "${ct_config}" ]] && ct_config_display="${ct_config}" || ct_config_display="(ct default)"
+    if (( ! ct_available )); then
+        ct_config_display="(ct not installed — plain ssh)"
+    elif [[ -n "${ct_config}" ]]; then
+        ct_config_display="${ct_config}"
+    else
+        ct_config_display="(ct default)"
+    fi
 
     # ── Build command arrays ──────────────────────────────────────────────────
     local -a ct_cmd ssh_extra_flags ssh_cmd
 
-    if [[ -n "${ct_config}" ]]; then
+    if (( ct_available )) && [[ -n "${ct_config}" ]]; then
         ct_cmd=( ct -c "${ct_config}" )
-    else
+    elif (( ct_available )); then
         ct_cmd=( ct )
+    else
+        ct_cmd=()
     fi
 
     [[ -n "${verbose_flag}" ]] && ssh_extra_flags+=( "${verbose_flag}" )
@@ -375,7 +377,11 @@ _ssh() {
             printf "[_ssh] ${green}✓${reset} ${resolved_host}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
             _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
-            "${ct_cmd[@]}" "${ssh_cmd[@]}"
+            if (( ${#ct_cmd[@]} > 0 )); then
+                "${ct_cmd[@]}" "${ssh_cmd[@]}"
+            else
+                "${ssh_cmd[@]}"
+            fi
             local -i exit_code=$?
 
             if (( exit_code == 255 )); then

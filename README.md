@@ -18,6 +18,7 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 - **Dry run mode** — `-n` prints the fully resolved command without executing
 - **Remote command passthrough** — pass a quoted command after the hostname
 - **Verbose SSH** — `-v` is forwarded to `ssh`
+- **ct is optional** — if ChromaTerm is not installed the plugin falls back to plain `ssh` with no highlighting; all other features (fuzzy matching, retry, caching, completion) continue to work
 - **Smart exit codes** — SSH-level failures (255) are reported; application-level non-zero codes pass through silently
 - **Context-aware tab completion** — hostnames annotated with profile; post-hostname completions offer device-specific commands (`show version`, `uname -a`, etc.)
 - **Completion works regardless of source order** — deferred `compdef` registration means the plugin can be sourced before or after `compinit`
@@ -26,6 +27,8 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 ---
 
 ## Prerequisite
+
+ChromaTerm is optional but recommended. Without it the plugin falls back to plain `ssh` with no highlighting:
 
 ```sh
 pip3 install chromaterm
@@ -152,25 +155,31 @@ The cache is also auto-pruned silently in the background at most once per day.
 
 ---
 
-## Bundled ct configs
+## ct highlight configs
 
-The `ct/` directory contains starter highlight rules for each profile. By
-default the plugin looks in `~/.local/chromaterm/` for your YAML files. The
-bundled configs in `ct/` are provided as a starting point — copy or symlink
-them there and customise as needed:
+This plugin uses [ct-highlight](https://github.com/lkowolowski/ct-highlight) for
+ChromaTerm highlight rules. Clone that repo and point `_SSH_CT_CONFIG_DIR` at it:
 
 ```zsh
-mkdir -p "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-cp ~/.zsh/zsh-ssh-ct/ct/*.yml "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm/"
+git clone https://github.com/lkowolowski/ct-highlight \
+    "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
+
+# In your .zshrc (before loading the plugin):
+export _SSH_CT_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
 ```
 
-| File          | Device type                                               |
-| ------------- | --------------------------------------------------------- |
-| `generic.yml` | Catch-all — used when no profile-specific config is found |
-| `juniper.yml` | Juniper JunOS                                             |
-| `cisco.yml`   | Cisco IOS / IOS-XE / NX-OS                                |
-| `panos.yml`   | Palo Alto PAN-OS                                          |
-| `unix.yml`    | Linux / Unix                                              |
+The plugin expects the following files in `_SSH_CT_CONFIG_DIR`:
+
+| File          | Profile flag | Device type                                               |
+| ------------- | ------------ | --------------------------------------------------------- |
+| `generic.yml` | —            | Catch-all — used when no profile-specific config is found |
+| `juniper.yml` | `-j`         | Juniper JunOS                                             |
+| `cisco.yml`   | `-c`         | Cisco IOS / IOS-XE / NX-OS                                |
+| `panos.yml`   | `-p`         | Palo Alto PAN-OS                                          |
+| `unix.yml`    | `-u`         | Linux / Unix                                              |
+
+The `ct/` directory in this repo contains minimal starter configs if you want
+to use this plugin without ct-highlight.
 
 ---
 
