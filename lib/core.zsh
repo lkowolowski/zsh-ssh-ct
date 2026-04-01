@@ -224,7 +224,7 @@ _ssh() {
                 (( i++ ))
                 exact_host="${args[i+1]}"
                 ;;
-            -v) verbose_flag="-v" ;;
+            -v) verbose_flag="-v"[118;1:3u ;;
             -n) dry_run=1 ;;
             -h|--help) _ssh_usage; return 0 ;;
             -*)
@@ -255,6 +255,15 @@ _ssh() {
     # -H overrides positional host
     [[ -n "${exact_host}" ]] && host="${exact_host}"
 
+    # ── Split user@host — preserve full string for ssh, extract host for ping ──
+    # Handles: host, user@host, user:password@host, user:port@host
+    # The ssh_target is passed to ssh as-is; ping_host is used for DNS/ping/fuzzy.
+    local ssh_target="${host}"
+    local ping_host="${host}"
+    if [[ "${host}" == *@* ]]; then
+        ping_host="${host##*@}"
+    fi
+
     # ── Resolve ct config — fall back to generic.yml if profile file missing ────
     local ct_config=""
     if (( ct_available )); then
@@ -274,35 +283,42 @@ _ssh() {
     # ── Detect bare IP addresses — treat like -H (skip fuzzy matching) ───────
     local ipv4_regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
     local ipv6_regex='^[0-9a-fA-F:]+:[0-9a-fA-F:]*$'
-    if [[ -z "${exact_host}" && ( "${host}" =~ ${ipv4_regex} || "${host}" =~ ${ipv6_regex} ) ]]; then
-        exact_host="${host}"
+    if [[ -z "${exact_host}" && ( "${ping_host}" =~ ${ipv4_regex} || "${ping_host}" =~ ${ipv6_regex} ) ]]; then
+        exact_host="${ping_host}"
     fi
 
-    # ── Fuzzy match (single call) ─────────────────────────────────────────────
+    # ── Fuzzy match on ping_host only (never on user@ prefix) ────────────────
     local resolved_host fuzzy_matched=0
 
     if [[ -n "${exact_host}" ]]; then
-        # -H flag or IP address: bypass fuzzy matching entirely
         resolved_host="${exact_host}"
     else
         local _fuzzy_result
-        _fuzzy_result="$(_ssh_fuzzy_match "${host}")"
+        _fuzzy_result="$(_ssh_fuzzy_match "${ping_host}")"
         local _fuzzy_rc=$?
-        if (( _fuzzy_rc == 0 )) && [[ "${_fuzzy_result}" != "${host}" ]]; then
+        if (( _fuzzy_rc == 0 )) && [[ "${_fuzzy_result}" != "${ping_host}" ]]; then
             resolved_host="${_fuzzy_result}"
             fuzzy_matched=1
         else
-            resolved_host="${host}"
+            resolved_host="${ping_host}"
         fi
     fi
 
+    # Rebuild ssh_target with resolved host, preserving any user@ prefix
+    if [[ "${host}" == *@* ]]; then
+        local user_prefix="${host%@*}@"
+        ssh_target="${user_prefix}${resolved_host}"
+    else
+        ssh_target="${resolved_host}"
+    fi
+
     if (( fuzzy_matched )); then
-        echo "[_ssh] Fuzzy matched '${host}' → '${resolved_host}'"
+        echo "[_ssh] Fuzzy matched '${ping_host}' → '${resolved_host}'"
         if (( _SSH_FUZZY_CONFIRM )); then
-            printf '[_ssh] Connect to %s? [Y/n] ' "${resolved_host}"
+            printf '[_ssh] Connect to %s? [Y/n] ' "${ssh_target}"
             local reply
-            # Read from /dev/tty explicitly so it works even when stdin is redirected
             read -r reply </dev/tty
+            # shellcheck disable=SC2299
             case "${reply:l}" in
                 n|no) echo "[_ssh] Aborted."; return 1 ;;
             esac
@@ -333,9 +349,9 @@ _ssh() {
     [[ -n "${verbose_flag}" ]] && ssh_extra_flags+=( "${verbose_flag}" )
 
     if (( ${#remote_cmd[@]} > 0 )); then
-        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${resolved_host}" "${remote_cmd[@]}" )
+        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" "${remote_cmd[@]}" )
     else
-        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${resolved_host}" )
+        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" )
     fi
 
     # ── Dry run ───────────────────────────────────────────────────────────────
@@ -355,7 +371,7 @@ _ssh() {
     local reset=$'\033[0m'
     local clreol=$'\033[K'
 
-    local status_prefix="[_ssh] ${resolved_host} (${profile_name})"
+    local status_prefix="[_ssh] ${ssh_target} (${profile_name})"
     local marks=""
 
     # Print the initial status line without a newline
@@ -374,7 +390,7 @@ _ssh() {
         # ── Ping ───────────────────────────────────────────────────────────
         if _ssh_ping "${resolved_host}"; then
             printf '\r%s\n' "${clreol}"
-            printf "[_ssh] ${green}✓${reset} ${resolved_host}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
+            printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
             _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
             if (( ${#ct_cmd[@]} > 0 )); then
