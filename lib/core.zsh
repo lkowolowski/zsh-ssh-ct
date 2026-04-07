@@ -224,7 +224,7 @@ _ssh() {
                 (( i++ ))
                 exact_host="${args[i+1]}"
                 ;;
-            -v) verbose_flag="-v"[118;1:3u ;;
+            -v) verbose_flag="-v" ;;
             -n) dry_run=1 ;;
             -h|--help) _ssh_usage; return 0 ;;
             -*)
@@ -328,9 +328,9 @@ _ssh() {
     # ── Show resolved ct config path ──────────────────────────────────────────
     local ct_config_display
     if (( ! ct_available )); then
-        ct_config_display="(ct not installed — plain ssh)"
+        ct_config_display="(no ct)"
     elif [[ -n "${ct_config}" ]]; then
-        ct_config_display="${ct_config}"
+        ct_config_display="${ct_config:t}"
     else
         ct_config_display="(ct default)"
     fi
