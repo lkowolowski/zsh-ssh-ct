@@ -201,10 +201,5 @@ to use this plugin without ct-highlight.
 │   ├── cache.zsh           ← cache read/write/TTL/prune/display
 │   ├── core.zsh            ← _ssh(), fuzzy match, ping, retry loop, usage
 │   └── complete.zsh        ← tab completion with deferred compdef registration
-├── ct/
-│   ├── juniper.yml         ← starter ChromaTerm rules
-│   ├── cisco.yml
-│   ├── panos.yml
-│   └── unix.yml
 └── README.md
 ```

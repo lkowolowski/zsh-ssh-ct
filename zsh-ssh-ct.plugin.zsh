@@ -51,8 +51,8 @@ typeset -gA _SSH_PROFILE_MAP=(
 typeset -gA _SSH_PROFILE_NAMES=(
     j  "Juniper"
     c  "Cisco"
-    p  "PAN-OS / Palo Alto"
-    u  "Unix / Linux"
+    p  "PAN-OS/Palo Alto"
+    u  "Unix/Linux"
 )
 
 # ── Source sub-modules ───────────────────────────────────────────────────────
