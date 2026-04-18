@@ -28,9 +28,9 @@ _SSH_OS="$(uname -s 2>/dev/null)"
 # ---------------------------------------------------------------------------
 _ssh_resolves() {
     local host="${1}"
-    if   command -v getent   &>/dev/null; then getent hosts "${host}"   &>/dev/null && return 0
-    elif command -v host     &>/dev/null; then host     "${host}"       &>/dev/null && return 0
+    if   command -v host     &>/dev/null; then host     "${host}"       &>/dev/null && return 0
     elif command -v nslookup &>/dev/null; then nslookup "${host}"       &>/dev/null && return 0
+    elif command -v getent   &>/dev/null; then getent hosts "${host}"   &>/dev/null && return 0
     fi
     # Last resort: 1-second TCP probe to port 22 (works when ICMP is blocked)
     if command -v nc &>/dev/null; then
