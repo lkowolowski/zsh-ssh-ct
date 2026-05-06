@@ -42,31 +42,44 @@ pip3 install chromaterm
 
 ```zsh
 # In your .zshrc zgenom save block:
-zgenom load <yourgithubuser>/zsh-ssh-ct
+zgenom load lkowolowski/zsh-ssh-ct
 ```
 
 ### zinit
 
 ```zsh
-zinit light <yourgithubuser>/zsh-ssh-ct
+zinit light lkowolowski/zsh-ssh-ct
 ```
 
 ### Oh My Zsh
 
 ```zsh
 # Clone into OMZ custom plugins directory
-git clone https://github.com/<yourgithubuser>/zsh-ssh-ct \
+git clone https://github.com/lkowolowski/zsh-ssh-ct \
     "${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}/plugins/zsh-ssh-ct"
 
 # Add to plugins list in ~/.zshrc
 plugins=(... zsh-ssh-ct)
 ```
 
+### zprezto
+
+```zsh
+# Clone in ~/zprezto/contrib directory
+git clone https://github.com/lkowolowski/zsh-ssh-ct
+
+# Add to zstyle load pmodule in ~/.zpreztorc
+zstyle ':prezto:load' pmodule \
+...
+'zsh-ssh-ct' \
+...
+```
+
 ### Manual
 
 ```zsh
 # 1. Clone the repo
-git clone https://github.com/<yourgithubuser>/zsh-ssh-ct ~/.zsh/zsh-ssh-ct
+git clone https://github.com/lkowolowski/zsh-ssh-ct ~/.zsh/zsh-ssh-ct
 
 # 2. Add to ~/.zshrc — config overrides MUST come before the source line
 #    (see Configuration section below)
@@ -136,7 +149,7 @@ export _SSH_RETRY_SLEEP=15
 
 # Plugin load (choose one)
 source ~/.zsh/zsh-ssh-ct/zsh-ssh-ct.plugin.zsh   # manual
-# zgenom load <yourgithubuser>/zsh-ssh-ct         # zgenom
+# zgenom load lkowolowski/zsh-ssh-ct         # zgenom
 ```
 
 ---
