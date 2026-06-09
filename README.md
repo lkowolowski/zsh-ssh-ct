@@ -16,6 +16,7 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 - **Portable ping** — correct flags detected for macOS and Linux at source time
 - **DNS vs ICMP distinction** — reports DNS failures separately from ping failures
 - **Dry run mode** — `-n` prints the fully resolved command without executing
+- **Force mode** — `-f` skips ping/DNS checks and tries SSH immediately (useful when ICMP is blocked)
 - **Remote command passthrough** — pass a quoted command after the hostname
 - **Verbose SSH** — `-v` is forwarded to `ssh`
 - **ct is optional** — if ChromaTerm is not installed the plugin falls back to plain `ssh` with no highlighting; all other features (fuzzy matching, retry, caching, completion) continue to work
@@ -117,6 +118,7 @@ _ssh -u web-server  "uname -a"
 _ssh -p fw-01 -v                      # verbose ssh
 _ssh -j rtr -n                        # dry run — print command only
 _ssh -j -H core-rtr-01               # exact hostname, skip fuzzy matching
+_ssh -u web-server -f                # force — skip ping/DNS, connect immediately
 ```
 
 Fuzzy matching: `_ssh -j core` resolves to e.g. `core-rtr-01` if that's the

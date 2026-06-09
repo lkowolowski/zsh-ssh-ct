@@ -170,6 +170,7 @@ Options:
   -H <host>  Exact hostname — bypass fuzzy matching entirely
   -v         Pass verbose flag to ssh
   -n         Dry run — print the resolved command without executing
+  -f         Force — skip ping/DNS checks, try SSH immediately
 
 Examples:
   _ssh -j core-router
@@ -205,7 +206,7 @@ _ssh() {
     command -v ct &>/dev/null && ct_available=1
 
     # ── Parse arguments ───────────────────────────────────────────────────────
-    local profile_flag="" verbose_flag="" exact_host="" dry_run=0
+    local profile_flag="" verbose_flag="" exact_host="" dry_run=0 force_flag=0
     local host=""
     local -a remote_cmd args=( "$@" )
     local -i i=0 nargs=${#args[@]}
@@ -226,6 +227,7 @@ _ssh() {
                 ;;
             -v) verbose_flag="-v" ;;
             -n) dry_run=1 ;;
+            -f) force_flag=1 ;;
             -h|--help) _ssh_usage; return 0 ;;
             -*)
                 echo "[_ssh] Unknown option: ${arg}" >&2
@@ -362,13 +364,26 @@ _ssh() {
         return 0
     fi
 
-    # ── Retry loop ────────────────────────────────────────────────────────────
-    local -i attempt=0 max_retries=${_SSH_MAX_RETRIES} sleep_sec=${_SSH_RETRY_SLEEP}
     local profile_name="${_SSH_PROFILE_NAMES[$profile_flag]}"
-
     local red=$'\033[0;31m'
     local green=$'\033[0;32m'
     local reset=$'\033[0m'
+
+    # ── Force mode: skip ping / DNS, try SSH immediately ─────────────────────
+    if (( force_flag )); then
+        printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  force\n"
+        _ssh_cache_add "${resolved_host}" "${profile_flag}"
+        if (( ${#ct_cmd[@]} > 0 )); then
+            "${ct_cmd[@]}" "${ssh_cmd[@]}"
+        else
+            "${ssh_cmd[@]}"
+        fi
+        return $?
+    fi
+
+    # ── Retry loop ────────────────────────────────────────────────────────────
+    local -i attempt=0 max_retries=${_SSH_MAX_RETRIES} sleep_sec=${_SSH_RETRY_SLEEP}
+
     local clreol=$'\033[K'
 
     local status_prefix="[_ssh] ${ssh_target} (${profile_name})"
@@ -390,7 +405,7 @@ _ssh() {
         # ── Ping ───────────────────────────────────────────────────────────
         if _ssh_ping "${resolved_host}"; then
             printf '\r%s\n' "${clreol}"
-            printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
+            printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}\n"
             _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
             if (( ${#ct_cmd[@]} > 0 )); then

@@ -68,7 +68,7 @@ _ssh_complete() {
                 profile_flag_given="${w#-}"
                 used_flags+=("${w}")
                 ;;
-            -v|-n|-H) used_flags+=("${w}") ;;
+            -v|-n|-H|-f) used_flags+=("${w}") ;;
         esac
         # Capture host: first non-flag word after the profile flag
         if [[ -n "${profile_flag_given}" && -z "${host_given}" \
@@ -88,10 +88,11 @@ _ssh_complete() {
         -u '-u[Unix / Linux profile (unix.yml)]'
         -v '-v[Verbose SSH output]'
         -n '-n[Dry run — print command without executing]'
+        -f '-f[Force — skip ping/DNS, try SSH immediately]'
         -H '-H[Exact hostname — bypass fuzzy matching]:host:_hosts'
     )
     local flag
-    for flag in -j -c -p -u -v -n -H; do
+    for flag in -j -c -p -u -v -n -f -H; do
         # Only offer if not already present in the command line
         if (( ! ${used_flags[(Ie)${flag}]} )); then
             profile_opts+=("${all_profile_opts[$flag]}")
@@ -148,7 +149,7 @@ _ssh_complete() {
             local -a display_strs=()
             local -i idx
             for (( idx = 1; idx <= ${#all_hosts[@]}; idx++ )); do
-                display_strs+=("${all_hosts[idx]}  ${all_descs[idx]}")
+                display_strs+=("${all_descs[idx]}")
             done
             compadd -M 'l:|=* r:|=*' -d display_strs -a all_hosts
         else
@@ -194,7 +195,7 @@ _ssh_cache_delete_complete() {
         local -a display_strs=()
         local -i idx
         for (( idx = 1; idx <= ${#hosts[@]}; idx++ )); do
-            display_strs+=("${hosts[idx]}  ${descs[idx]}")
+            display_strs+=("${descs[idx]}")
         done
         compadd -d display_strs -a hosts
     fi
