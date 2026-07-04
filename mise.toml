@@ -1,0 +1,40 @@
+# mise.toml — task runner for local linting and validation
+# Usage:
+#   mise run lint          run all linters
+#   mise run shellcheck    shellcheck on all .zsh files
+#   mise run zsh-check     zsh -n syntax check on all .zsh files
+#   mise run yamllint      yamllint on all .yml files
+#   mise run markdownlint  markdownlint on all .md files
+#   mise run pre-commit    run all pre-commit hooks
+
+[tasks.lint]
+description = "Run all linters"
+depends = ["shellcheck", "zsh-check", "yamllint", "markdownlint"]
+
+[tasks.shellcheck]
+description = "ShellCheck on all .zsh files"
+run = "shellcheck --severity=warning --color=always $(find . -name '*.zsh' -not -path './.git/*')"
+
+[tasks.zsh-check]
+description = "zsh -n syntax check on all .zsh files"
+run = """\
+for f in $(find . -name '*.zsh' -not -path './.git/*'); do
+	zsh -n "$f" && echo "  ok  $f" || exit 1
+done
+"""
+
+[tasks.yamllint]
+description = "yamllint on all .yml files"
+run = "yamllint -c .yamllint.yml $(find . -name '*.yml' -not -name '.pre-commit-config.yaml' -not -path './.git/*')"
+
+[tasks.markdownlint]
+description = "markdownlint on all .md files"
+run = "markdownlint --config .markdownlint.yml $(find . -name '*.md' -not -path './.git/*')"
+
+[tasks.pre-commit]
+description = "Run all pre-commit hooks against every file"
+run = "pre-commit run --all-files"
+
+[tasks.test]
+description = "Alias for lint"
+depends = ["lint"]

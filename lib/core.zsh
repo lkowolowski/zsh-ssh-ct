@@ -393,6 +393,24 @@ _ssh() {
             printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
             _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
+            # Try init-commands first (replaces normal SSH if commands found)
+            local -i init_exit
+            _ssh_init_execute "${profile_flag}" "${resolved_host}" \
+                "${ssh_target}" "${ct_config}" "${verbose_flag:-}" \
+                "${ct_available}" "${remote_cmd[@]}"
+            init_exit=$?
+
+            # If init_execute returned 0 with non-empty commands, it handled
+            # the session via zpty — use its exit code.
+            # If 0 with empty commands (skip), fall through to normal SSH.
+            if (( init_exit == 0 )) && _ssh_init_did_run; then
+                local -i exit_code="${init_exit}"
+                if (( exit_code == 255 )); then
+                    echo "[_ssh] SSH connection failed (exit 255)." >&2
+                fi
+                return "${exit_code}"
+            fi
+
             if (( ${#ct_cmd[@]} > 0 )); then
                 "${ct_cmd[@]}" "${ssh_cmd[@]}"
             else

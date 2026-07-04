@@ -1,0 +1,49 @@
+# Init-commands configuration for zsh-ssh-ct
+# Path defined by _SSH_REMOTE_CMDS env var
+# (default: ~/.config/zsh-ssh-ct/init-commands.yml)
+#
+# Schema:
+#   defaults      — global defaults inherited by all platforms
+#   platforms     — per-platform (juniper, cisco, panos, unix)
+#   hosts         — per-host overrides (hostname key, optional platform ref)
+#
+# Layering: host > platform > defaults
+# Commands: platform list first, then host list appended (deduped first-match-wins)
+# Sentinel: commands: ["none"] skips init-commands entirely
+
+defaults:
+  timeout: 5
+  prompt: '[>#$]'
+  commands: []
+
+platforms:
+  juniper:
+    prompt: '> $'
+    timeout: 10
+    commands:
+      - "set cli screen-length 0"
+      - "set cli timestamp"
+  cisco:
+    prompt: '[#>]'
+    commands:
+      - "term length 0"
+      - "term width 0"
+  panos:
+    prompt: '[>#$]'
+    commands:
+      - "set cli pager off"
+      - "set session timeout 0"
+  unix:
+    prompt: '[#$]'
+
+# Customize per-host in ~/.config/zsh-ssh-ct/init-commands.yml:
+hosts: {}
+#   core-router:
+#     platform: juniper
+#     prompt: 'custom>$'
+#     timeout: 15
+#     commands:
+#       - "show configuration | display set"
+#   backup-router:
+#     platform: juniper
+#     commands: ["none"]

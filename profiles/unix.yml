@@ -1,0 +1,384 @@
+# ChromaTerm highlight rules for Linux / Unix / macOS / FreeBSD
+# Covers: ifconfig (Linux + macOS/BSD), ip addr, ip link, ip -s link,
+#         ip route, ip neigh, arp -n
+#
+# Shared semantic palette (normalized with junos.yml and cisco.yml):
+#   red       #e06c75  errors, down states, failed/incomplete, non-zero error counters
+#   orange    #d19a66  warnings, degraded states, secondary values
+#   gold      #e5c07b  MAC addresses, IPv4 addresses, IPv6 addresses
+#   green     #98c379  up/running/active/reachable states
+#   cyan      #56b6c2  interface names (underline), keywords/labels
+#   blue      #61afef  primary field labels (inet, inet6, ether, flags...)
+#   lightblue #00afff  interface flags inside <...> brackets
+#   purple    #c678dd  metrics (mtu, txqueuelen, prefixlen, metric, rates)
+#   grey      #7c8fa0  secondary info (scope, brd, scopeid, valid_lft, forever)
+
+palette:
+  red: "#e06c75"
+  orange: "#d19a66"
+  gold: "#e5c07b"
+  green: "#98c379"
+  cyan: "#56b6c2"
+  blue: "#61afef"
+  lightblue: "#00afff"
+  purple: "#c678dd"
+  grey: "#7c8fa0"
+
+rules:
+  # ════════════════════════════════════════════════════════════════════════════
+  # Interface names (cyan underline)
+  # Covers Linux predictable names, legacy ethN, macOS enN/utunN/bridgeN,
+  # BSD names, tunnels, vlans, bonds, bridges, wireguard, docker, etc.
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Linux predictable interface names (enpNsN, ensN, eno1, etc.)
+    regex: '\b(?:en[opsx]\d+(?:np\d+)?(?:d\d+)?(?:f\d+)?(?:v\d+)?|eno\d+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Legacy Linux ethernet (ethN)
+    regex: '\beth\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: macOS / BSD ethernet (en0, en1, ...)
+    regex: '\ben\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Loopback interface (lo, lo0)
+    regex: '\blo\d*\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Wireless interfaces (wlan, wlp, wlo, ath, wifi, wifiN)
+    regex: '\b(?:wlan\d+|wlp\d+s\d+(?:f\d+)?|wlo\d+|ath\d+|wifi\d*)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Tunnel interfaces — Linux/macOS/BSD (tunN, utunN, gre, sit, ipip, ip6tnl)
+    regex: '\b(?:tun\d+|utun\d+|gre\d+|ipip\d+|ip6tnl\d+|sit\d+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: VLAN interfaces — Linux/BSD (eth0.100, vlanN)
+    regex: '\b(?:\w+\.\d{1,4}|vlan\d+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Bond / team interfaces — Linux (bondN, teamN)
+    regex: '\b(?:bond\d+|team\d+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Bridge interfaces — Linux (brN, bridgeN, virbr)
+    regex: '\b(?:br\d+|bridge\d+|virbr\d+(?:-nic)?)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Virtual / container interfaces — Linux (vethN, vnetN, tapN, macvlanN, dummy)
+    regex: '\b(?:veth[a-f0-9]+|vnet\d+|tap\d+|macvlan\d+|dummy\d+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: Docker / podman / k8s interfaces — Linux (docker0, cni0, flannel, cali*, cilium)
+    regex: '\b(?:docker\d+|cni\d+|flannel\.\d+|cali[a-f0-9]+|cilium\w*|kube-\w+)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: WireGuard interfaces — Linux/BSD (wg0, wg1)
+    regex: '\bwg\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: macOS-specific interfaces (anpi, llw, awdl, stf, gif, faith)
+    regex: '\b(?:anpi\d+|llw\d+|awdl\d+|stf\d*|gif\d*|faith\d*)\b'
+    color: f.cyan underline
+    exclusive: true
+
+  # ── FreeBSD interface names ────────────────────────────────────────────────
+  # All follow the pattern <name><N> except epair which is <name><N>[ab]
+
+  - description: FreeBSD copper / server NICs (em, fxp, igb, ix, ixl, re, bge, bnx, bnxt, i40e)
+    regex: '\b(?:em|fxp|igb|ix|ixl|re|bge|bnx|bnxt|i40e)\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD high-speed / datacenter NICs (cxgbe, mce, axge)
+    regex: '\b(?:cxgbe|mce|axge)\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD USB / wireless NICs (cdce, ue, rum, run, urtw, ath, athp, iwn, iwm)
+    regex: '\b(?:cdce|ue|rum|run|urtw|ath|athp|iwn|iwm)\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD virtual / hypervisor NICs (vnet, ipmi)
+    regex: '\b(?:vnet|ipmi)\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD special / tunnel interfaces (gif, gre, pflog, pfsync, enc, ipsec, fwe, stf)
+    regex: '\b(?:gif|gre|pflog|pfsync|enc|ipsec|fwe|stf)\d*\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD CARP interface
+    regex: '\bcarp\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD aggregation / bridging (lagg, bridge, tap)
+    regex: '\b(?:lagg|bridge|tap)\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: FreeBSD epair interfaces (epair0a, epair1b — jail veth equivalent)
+    regex: '\bepair\d+[ab]\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: "Interface name at start of ifconfig line (name: or name followed by flags)"
+    regex: '^[a-z][a-z0-9\.\-]+(?=:\s)'
+    color: f.cyan underline bold
+    exclusive: true
+
+  - description: "Interface index number at start of ip output line (N: ifname:)"
+    regex: '^\d+(?=:\s)'
+    color: f.grey
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Addresses
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: MAC address (colon-separated)
+    regex: '\b[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}\b'
+    color: f.gold
+    exclusive: true
+
+  - description: IPv4 address (with optional prefix / netmask notation)
+    regex: '\b(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})){3}(?:/\d{1,2})?\b'
+    color: f.gold underline
+    exclusive: true
+
+  - description: IPv6 address (with optional prefix length, with or without %iface zone)
+    regex: '(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(?:%[a-z][a-z0-9]*)?(?:/\d{1,3})?'
+    color: f.gold underline
+    exclusive: true
+
+  - description: macOS hex netmask (0xffffff00 style)
+    regex: '0x[0-9a-fA-F]{8}\b'
+    color: f.gold
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Interface up / down / running states
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Interface state UP / RUNNING / ACTIVE
+    regex: '\b(?:UP|RUNNING|ACTIVE|active)\b'
+    color: f.green bold
+
+  - description: Interface state DOWN / inactive
+    regex: '\b(?:DOWN|inactive)\b'
+    color: f.red bold
+
+  - description: state UP in ip output (state UP / UNKNOWN)
+    regex: '\bstate (?:UP|UNKNOWN)\b'
+    color: f.green
+
+  - description: state DOWN in ip output
+    regex: '\bstate DOWN\b'
+    color: f.red bold
+
+  - description: ifconfig status active
+    regex: "^(?:\\s+)status: active"
+    color: f.green
+
+  - description: ifconfig status inactive / no carrier
+    regex: "^(?:\\s+)status: (?:inactive|no carrier)"
+    color: f.red bold
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Interface flags inside <...> brackets (lightblue)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Interface flags block
+    regex: "<[A-Z_,]+>"
+    color: f.lightblue
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Field labels (blue)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: inet / inet6 address family label
+    regex: '\binet6?\b'
+    color: f.blue
+
+  - description: ether / link/ether / link/loopback label
+    regex: '\b(?:ether|link\/(?:ether|loopback|none))\b'
+    color: f.blue
+
+  - description: flags label
+    regex: '\bflags='
+    color: f.blue
+
+  - description: ip addr/route keyword labels
+    regex: '\b(?:brd|scope|dynamic|secondary|tentative|deprecated|dadfailed|temporary|mngtmpaddr|noprefixroute|nodad|optimistic|valid_lft|preferred_lft|dev|via|src|proto|metric|onlink|table|weight)\b'
+    color: f.blue
+
+  - description: netmask / broadcast labels (ifconfig)
+    regex: '\b(?:netmask|broadcast)\b'
+    color: f.blue
+
+  - description: media / nd6 / txqueuelen / qdisc labels
+    regex: '\b(?:media|nd6|txqueuelen|qdisc|group|mode)\b'
+    color: f.blue
+
+  - description: RX / TX labels in ifconfig and ip -s
+    regex: '^\s+(?:RX|TX)(?:\s+packets|\s+errors|:)'
+    color: f.blue bold
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Metrics (purple)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: MTU value
+    regex: '\bmtu \d+\b'
+    color: f.purple
+
+  - description: prefixlen / prefix length value
+    regex: '\bprefixlen \d+\b'
+    color: f.purple
+
+  - description: metric value
+    regex: '\bmetric \d+\b'
+    color: f.purple
+
+  - description: txqueuelen value
+    regex: '(?<=txqueuelen )\d+'
+    color: f.purple
+
+  - description: byte / packet counts (ifconfig human-readable)
+    regex: '\d+(?:\.\d+)? (?:[KMGT]iB|[KMGT]B|bytes?|packets?)\b'
+    color: f.purple
+
+  - description: media speed (ifconfig macOS — 1000baseT, 100baseTX, etc.)
+    regex: '\b\d+(?:base[A-Z0-9\-]+)\b'
+    color: f.purple
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Non-zero error counters — ip -s link / ifconfig (red bold)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Non-zero errors in ifconfig RX/TX line
+    regex: 'errors [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero dropped in ifconfig RX/TX line
+    regex: 'dropped [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero overruns in ifconfig
+    regex: 'overruns? [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero frame errors in ifconfig
+    regex: 'frame [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero carrier errors in ifconfig
+    regex: 'carrier [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero collisions in ifconfig
+    regex: 'collisions? [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero missed in ip -s link
+    regex: 'missed [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero collsns in ip -s link
+    regex: 'collsns [1-9]\d*'
+    color: f.red bold
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # ip route output
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Default route keyword
+    regex: '^default\b'
+    color: f.cyan bold
+
+  - description: Route protocol (proto kernel / proto dhcp / proto static / proto bird)
+    regex: '\bproto (?:kernel|dhcp|static|bird|bgp|ospf|isis|babel|ra|boot)\b'
+    color: f.purple
+
+  - description: Route scope (scope link / scope host / scope global)
+    regex: '\bscope (?:link|host|global)\b'
+    color: f.grey
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # ip neigh / arp output — neighbor states
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: Neighbor state REACHABLE / PERMANENT
+    regex: '\b(?:REACHABLE|PERMANENT)\b'
+    color: f.green
+
+  - description: Neighbor state STALE
+    regex: '\bSTALE\b'
+    color: f.orange
+
+  - description: Neighbor state FAILED / INCOMPLETE
+    regex: '\b(?:FAILED|INCOMPLETE)\b'
+    color: f.red bold
+
+  - description: Neighbor state DELAY / PROBE / NOARP
+    regex: '\b(?:DELAY|PROBE|NOARP)\b'
+    color: f.orange
+
+  - description: ARP incomplete entry
+    regex: '\(incomplete\)'
+    color: f.red bold
+
+  - description: lladdr keyword in ip neigh
+    regex: '\blladdr\b'
+    color: f.blue
+
+  - description: ARP HWtype (ether)
+    regex: "(?<![a-zA-Z0-9_-])ether(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: ARP flags (C = complete, M = permanent, P = published)
+    regex: '(?<=\s{3})[CMP](?=\s)'
+    color: f.grey
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Secondary / noise (grey)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  - description: valid_lft / preferred_lft values
+    regex: '(?:valid_lft|preferred_lft) \S+'
+    color: f.grey
+
+  - description: forever (lft value — stable, low noise)
+    regex: '\bforever\b'
+    color: f.grey
+
+  - description: scopeid value
+    regex: "scopeid 0x[0-9a-fA-F]+"
+    color: f.grey
+
+  - description: nd6 options
+    regex: 'nd6 options=\S+'
+    color: f.grey
+
+  - description: qdisc value (noqueue / mq / fq_codel / pfifo_fast / noop)
+    regex: '(?<=qdisc )(?:noqueue|mq|fq_codel|pfifo_fast|pfifo|noop|cake|tbf|htb)\b'
+    color: f.grey
+
+  - description: Interface alias / secondary label
+    regex: '\b(?:alias|altname)\b'
+    color: f.grey

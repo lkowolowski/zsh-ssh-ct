@@ -22,7 +22,8 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 - **Smart exit codes** — SSH-level failures (255) are reported; application-level non-zero codes pass through silently
 - **Context-aware tab completion** — hostnames annotated with profile; post-hostname completions offer device-specific commands (`show version`, `uname -a`, etc.)
 - **Completion works regardless of source order** — deferred `compdef` registration means the plugin can be sourced before or after `compinit`
-- **Bundled starter ct YAML configs** for all four device types
+- **Init-commands** — automatically sends platform/host commands after SSH connects via zsh/zpty (zero deps); config-driven with host > platform > defaults cascade; silent skip when no config, no match, or `commands: ["none"]` ([docs](docs/init-commands.md))
+- **Bundled ct highlight configs** — full ct-highlight YAMLs for all four device types in `profiles/` ([docs](docs/ct-highlight.md))
 
 ---
 
@@ -128,14 +129,16 @@ best scoring candidate from your known hosts / cache.
 
 Set any of these in your `.zshrc` **before** the `source` / `zgenom load` line:
 
-| Variable              | Default                       | Description                                                                               |
-| --------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `_SSH_CT_CONFIG_DIR`  | `$XDG_CONFIG_HOME/chromaterm` | Directory containing ct YAML files (`~/.config/chromaterm` if `XDG_CONFIG_HOME` is unset) |
-| `_SSH_CACHE_FILE`     | `~/.cache/zsh-ssh-ct/hosts`   | Host cache file path                                                                      |
-| `_SSH_MAX_RETRIES`    | `60`                          | Maximum ping retry iterations                                                             |
-| `_SSH_RETRY_SLEEP`    | `30`                          | Seconds between retries                                                                   |
-| `_SSH_CACHE_TTL_DAYS` | `30`                          | Days before cache entries expire (`0` = forever)                                          |
-| `_SSH_FUZZY_CONFIRM`  | `0`                           | Set to `1` to prompt before connecting to fuzzy-matched hosts                             |
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `_SSH_CT_CONFIG_DIR` | `$XDG_CONFIG_HOME/chromaterm` | Directory containing ct YAML files (`~/.config/chromaterm` if `XDG_CONFIG_HOME` is unset) |
+| `_SSH_CACHE_FILE` | `~/.cache/zsh-ssh-ct/hosts` | Host cache file path |
+| `_SSH_MAX_RETRIES` | `60` | Maximum ping retry iterations |
+| `_SSH_RETRY_SLEEP` | `30` | Seconds between retries |
+| `_SSH_CACHE_TTL_DAYS` | `30` | Days before cache entries expire (`0` = forever) |
+| `_SSH_FUZZY_CONFIRM` | `0` | Set to `1` to prompt before connecting to fuzzy-matched hosts |
+| `_SSH_REMOTE_CMDS` | `$XDG_CONFIG_HOME/zsh-ssh-ct/init-commands.yml` | Init-commands YAML config path ([docs](docs/init-commands.md)) |
+| `_SSH_INIT_CMD_SKIP_PROFILES` | `u` | Profiles to skip for init-commands (e.g. `"u"`, `"uc"`) |
 
 ### Example `.zshrc`
 
@@ -168,34 +171,6 @@ The cache is also auto-pruned silently in the background at most once per day.
 
 ---
 
-## ct highlight configs
-
-This plugin uses [ct-highlight](https://github.com/lkowolowski/ct-highlight) for
-ChromaTerm highlight rules. Clone that repo and point `_SSH_CT_CONFIG_DIR` at it:
-
-```zsh
-git clone https://github.com/lkowolowski/ct-highlight \
-    "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-
-# In your .zshrc (before loading the plugin):
-export _SSH_CT_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-```
-
-The plugin expects the following files in `_SSH_CT_CONFIG_DIR`:
-
-| File          | Profile flag | Device type                                               |
-| ------------- | ------------ | --------------------------------------------------------- |
-| `generic.yml` | —            | Catch-all — used when no profile-specific config is found |
-| `juniper.yml` | `-j`         | Juniper JunOS                                             |
-| `cisco.yml`   | `-c`         | Cisco IOS / IOS-XE / NX-OS                                |
-| `panos.yml`   | `-p`         | Palo Alto PAN-OS                                          |
-| `unix.yml`    | `-u`         | Linux / Unix                                              |
-
-The `ct/` directory in this repo contains minimal starter configs if you want
-to use this plugin without ct-highlight.
-
----
-
 ## Known limitations
 
 **Completion cache is per-session** — `~/.ssh/known_hosts` is parsed once per shell session and cached in memory, invalidated only when the file's mtime changes. If you SSH to a new host in one terminal and want it to appear in completions in another, open a new shell or run `_ssh_cache_clear` to force a refresh.
@@ -206,6 +181,11 @@ to use this plugin without ct-highlight.
 
 ---
 
+## Further reading
+
+- **Init-commands** — [docs/init-commands.md](docs/init-commands.md) — full schema, layering, gating
+- **ct highlight configs** — [docs/ct-highlight.md](docs/ct-highlight.md) — setup, profiles, customization
+
 ## File layout
 
 ```text
@@ -213,6 +193,16 @@ to use this plugin without ct-highlight.
 ├── lib/
 │   ├── cache.zsh           ← cache read/write/TTL/prune/display
 │   ├── core.zsh            ← _ssh(), fuzzy match, ping, retry loop, usage
-│   └── complete.zsh        ← tab completion with deferred compdef registration
+│   ├── complete.zsh        ← tab completion with deferred compdef registration
+│   └── init.zsh            ← init-commands via zsh/zpty
+├── profiles/               ← full ct-highlight YAMLs (generic, juniper, cisco, panos, unix)
+├── configs/
+│   └── init-commands.yml   ← starter init-commands config
+├── docs/
+│   ├── init-commands.md    ← init-commands reference
+│   ├── ct-highlight.md     ← ct highlight config reference
+│   └── ADR/                ← architecture decision records
+│       ├── 001-zsh-zpty-mechanism.md
+│       └── 002-single-file-config-path.md
 └── README.md
 ```

@@ -29,6 +29,10 @@ typeset -g _SSH_PLUGIN_DIR="${0:A:h}"
 #   _SSH_RETRY_SLEEP       30                                   seconds between retries
 #   _SSH_CACHE_TTL_DAYS    30                                   cache entry TTL (0=forever)
 #   _SSH_FUZZY_CONFIRM     0                                    prompt before fuzzy connect
+#   _SSH_REMOTE_CMDS       $XDG_CONFIG_HOME/zsh-ssh-ct/init-com  init-commands YAML path
+#                          mands.yml
+#   _SSH_INIT_CMD_SKIP_    "u"                                   profiles to skip (j/c/p/u)
+#   PROFILES
 #
 # Resolve XDG_CONFIG_HOME with the spec-compliant fallback of ~/.config
 : "${XDG_CONFIG_HOME:=${HOME}/.config}"
@@ -38,6 +42,8 @@ typeset -g _SSH_PLUGIN_DIR="${0:A:h}"
 : "${_SSH_RETRY_SLEEP:=30}"
 : "${_SSH_CACHE_TTL_DAYS:=30}"
 : "${_SSH_FUZZY_CONFIRM:=0}"
+: "${_SSH_REMOTE_CMDS:=${XDG_CONFIG_HOME}/zsh-ssh-ct/init-commands.yml}"
+: "${_SSH_INIT_CMD_SKIP_PROFILES:=u}"
 
 # ── Profile → ct YAML mapping ────────────────────────────────────────────────
 typeset -gA _SSH_PROFILE_MAP=(
@@ -59,6 +65,7 @@ typeset -gA _SSH_PROFILE_NAMES=(
 source "${_SSH_PLUGIN_DIR}/lib/cache.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/core.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/complete.zsh"
+source "${_SSH_PLUGIN_DIR}/lib/init.zsh"
 
 # ── Auto-prune stale cache entries (at most once per day, runs in background) ─
 _ssh_cache_maybe_prune
