@@ -1,0 +1,322 @@
+# ChromaTerm highlight rules for PAN-OS (Palo Alto Networks)
+# Covers: config mode (set/edit/show), show interface, show routing route,
+#         show arp all, show session all, show high-availability state,
+#         show system info, show log traffic/threat, show counter global.
+#
+# Shared semantic palette (normalized with junos.yml and cisco.yml):
+#   red       #e06c75  errors, deny, down, drop, critical, blocked
+#   orange    #d19a66  warnings, medium severity, degraded states
+#   gold      #e5c07b  MAC addresses, IPv4/IPv6 addresses, zone names
+#   green     #98c379  allow, up, active, established, pass
+#   cyan      #56b6c2  interface names, protocols, application names
+#   blue      #61afef  primary keywords, field labels
+#   lightblue #00afff  root structural keywords (vsys, deviceconfig, network)
+#   purple    #c678dd  config sub-keywords, NAT types, rule types
+#   grey      #7c8fa0  comments, timestamps, secondary info
+#   white     #eeeeee  object/rule names (address objects, security rules)
+#
+# Word boundary: uses (?<![a-zA-Z0-9_-]) / (?![a-zA-Z0-9_-]) for short
+# keywords that could appear inside hyphenated compound words.
+
+palette:
+  red: "#e06c75"
+  orange: "#d19a66"
+  gold: "#e5c07b"
+  green: "#98c379"
+  cyan: "#56b6c2"
+  blue: "#61afef"
+  lightblue: "#00afff"
+  purple: "#c678dd"
+  grey: "#7c8fa0"
+  white: "#eeeeee"
+
+rules:
+  # ── Comments (# lines) ─────────────────────────────────────────────────────
+  - description: PAN-OS comment line
+    regex: "#.*$"
+    color: f.grey italic
+
+  # ── Quoted strings (exclusive) ─────────────────────────────────────────────
+  - description: PAN-OS quoted string
+    regex: '"[^"]*"'
+    color: f.white
+    exclusive: true
+
+  # ── IPv4 addresses (gold underline) ───────────────────────────────────────
+  - description: IPv4 address (with optional prefix length or netmask)
+    regex: '\b(25[0-5]|2[0-4]\d|[01]?\d{1,2})(\.(25[0-5]|2[0-4]\d|[01]?\d{1,2})){3}(/\d{1,2})?\b'
+    color: f.gold underline
+    exclusive: true
+
+  # ── MAC addresses (gold) ───────────────────────────────────────────────────
+  - description: MAC address (colon-separated)
+    regex: '\b[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}\b'
+    color: f.gold
+    exclusive: true
+
+  # ── Interface names (cyan underline) ──────────────────────────────────────
+  - description: PAN-OS ethernet interface (ethernet1/1, ethernet1/1.100)
+    regex: '\bethernet\d+/\d+(?:\.\d+)?\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: PAN-OS aggregate ethernet interface (ae1, ae1.200)
+    regex: '\bae\d+(?:\.\d+)?\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: PAN-OS tunnel interface (tunnel.1)
+    regex: '\btunnel\.\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: PAN-OS loopback interface (loopback.1)
+    regex: '\bloopback\.\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: PAN-OS VLAN interface (vlan.10)
+    regex: '\bvlan\.\d+\b'
+    color: f.cyan underline
+    exclusive: true
+
+  - description: PAN-OS management interface
+    regex: '\bmanagement\b'
+    color: f.cyan underline
+
+  - description: PAN-OS HA / HSCI interface
+    regex: '\b(?:hsci|ha\d*)\b'
+    color: f.cyan underline
+
+  # ── Interface status (show interface output) ───────────────────────────────
+  - description: Interface state up
+    regex: "(?<![a-zA-Z0-9_-])up(?![a-zA-Z0-9_-])"
+    color: f.green
+
+  - description: Interface state down
+    regex: "(?<![a-zA-Z0-9_-])down(?![a-zA-Z0-9_-])"
+    color: f.red bold
+
+  # ── Root structural keywords (lightblue) ───────────────────────────────────
+  - description: PAN-OS top-level config stanzas
+    regex: "(?<![a-zA-Z0-9_-])(vsys|deviceconfig|network|shared|panorama|predefined)(?![a-zA-Z0-9_-])"
+    color: f.lightblue
+
+  # ── Zone names — highlight the keyword, name follows as white quoted string
+  - description: PAN-OS zone keyword
+    regex: "(?<![a-zA-Z0-9_-])zone(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  # ── Security policy actions (green / red) ─────────────────────────────────
+  - description: Security policy action allow
+    regex: "(?<![a-zA-Z0-9_-])allow(?![a-zA-Z0-9_-])"
+    color: f.green bold
+    exclusive: true
+
+  - description: Security policy action deny / drop
+    regex: "(?<![a-zA-Z0-9_-])(deny|drop)(?![a-zA-Z0-9_-])"
+    color: f.red bold
+    exclusive: true
+
+  - description: Security policy action reset
+    regex: '\b(reset-client|reset-server|reset-both)\b'
+    color: f.red bold
+    exclusive: true
+
+  # ── Config mode verbs (blue) ───────────────────────────────────────────────
+  - description: PAN-OS operational / configure mode verbs
+    regex: "(?<![a-zA-Z0-9_-])(set|delete|rename|move|clone|show|edit|exit|quit|commit|revert|save|load|run)(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  # ── Configuration keywords (purple) ───────────────────────────────────────
+  - description: PAN-OS security rule keywords
+    regex: "(?<![a-zA-Z0-9_-])(source|destination|application|service|category|profile|schedule|tag|description|disabled|log-start|log-end|log-setting|action|profile-setting|group|negate|target|hip-profiles)(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: PAN-OS network / interface keywords
+    regex: "(?<![a-zA-Z0-9_-])(ip-address|netmask|default-gateway|mtu|speed|duplex|link-state|layer3|layer2|virtual-wire|tap|decrypt-mirror|aggregate-group)(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: PAN-OS routing keywords
+    regex: "(?<![a-zA-Z0-9_-])(nexthop|metric|admin-dist|path-monitor|bfd|unicast|multicast|route|virtual-router)(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: PAN-OS NAT keywords
+    regex: "(?<![a-zA-Z0-9_-])(nat|static-ip|dynamic-ip-and-port|dynamic-ip|destination-translation|source-translation|translated-address|translated-port|interface-address)(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: PAN-OS address object types
+    regex: '\b(ip-netmask|ip-range|ip-wildcard|fqdn)\b'
+    color: f.purple
+
+  # ── Protocols (cyan) ───────────────────────────────────────────────────────
+  - description: PAN-OS L4 protocols
+    regex: "(?<![a-zA-Z0-9_-])(tcp|udp|icmp|icmpv6|sctp|gre|esp|ah)(?![a-zA-Z0-9_-])"
+    color: f.cyan
+
+  - description: PAN-OS routing protocols
+    regex: "(?<![a-zA-Z0-9_-])(ospf|bgp|rip|ebgp|ibgp)(?![a-zA-Z0-9_-])"
+    color: f.cyan
+
+  # ── NAT type (purple) ─────────────────────────────────────────────────────
+  - description: PAN-OS NAT rule type
+    regex: '\b(ipv4|nat64|nptv6)\b'
+    color: f.purple
+
+  # ── HA states (show high-availability state) ───────────────────────────────
+  - description: HA state active / active-active / active-passive
+    regex: '\b(active-active|active-passive|active)\b'
+    color: f.green bold
+
+  - description: HA state passive
+    regex: '\bpassive\b'
+    color: f.orange
+
+  - description: HA state suspended / non-functional / tentative
+    regex: '\b(suspended|non-functional|tentative|initial)\b'
+    color: f.red bold
+
+  - description: HA synchronization state synchronized
+    regex: '\b(?:synchronized|in sync)\b'
+    color: f.green
+
+  - description: HA synchronization state not synchronized
+    regex: '\b(?:not synchronized|out of sync)\b'
+    color: f.red bold
+
+  - description: HA priority / preemption keywords
+    regex: '\b(priority|preemptive|preemption|heartbeat|hello-interval)\b'
+    color: f.blue
+
+  # ── Session table (show session all) ──────────────────────────────────────
+  - description: Session state ACTIVE
+    regex: '\bACTIVE\b'
+    color: f.green
+
+  - description: Session state CLOSING / CLOSED
+    regex: '\b(CLOSING|CLOSED)\b'
+    color: f.orange
+
+  - description: Session state FREE / INIT
+    regex: '\b(FREE|INIT)\b'
+    color: f.grey
+
+  - description: Session type NS (normal) / PREDICT / TUNNEL
+    regex: '\b(NS|PREDICT|TUNNEL|APP-ID|CAPTIVE)\b'
+    color: f.cyan
+
+  - description: Session flag flow allow / deny
+    regex: '\bflow (allow|deny)\b'
+    color:
+      1: f.green
+
+  # ── Threat / log severity ─────────────────────────────────────────────────
+  - description: Severity critical
+    regex: '(?i)\bcritical\b'
+    color: f.red bold
+
+  - description: Severity high
+    regex: "(?i)(?<![a-zA-Z0-9_-])high(?![a-zA-Z0-9_-])"
+    color: f.red
+
+  - description: Severity medium
+    regex: '(?i)\bmedium\b'
+    color: f.orange
+
+  - description: Severity low
+    regex: "(?i)(?<![a-zA-Z0-9_-])low(?![a-zA-Z0-9_-])"
+    color: f.orange
+
+  - description: Severity informational
+    regex: '(?i)\binformational\b'
+    color: f.blue
+
+  # ── Counters / error conditions (show counter global) ─────────────────────
+  - description: Non-zero drop / error counter
+    regex: '[1-9]\d*\s+(?:drop|error|err|discard|exceed|overflow|timeout|fail)\w*'
+    color: f.red bold
+
+  - description: Counter severity error/warn labels
+    regex: '\b(error|warn)\b'
+    color: f.orange
+
+  # ── show routing route ─────────────────────────────────────────────────────
+  - description: Route flags active / best
+    regex: '\b[AEBHCSIO]\b(?=\s)'
+    color: f.cyan
+
+  - description: Route nexthop keyword
+    regex: '\bnexthop\b'
+    color: f.blue
+
+  - description: Route metric / preference
+    regex: '(?<![a-zA-Z0-9_-])(metric|preference)(?![a-zA-Z0-9_-])\s+\d+'
+    color: f.purple
+
+  - description: Route age / uptime
+    regex: '\b(?:(?:\d+w)?(?:\d+d)?\s*\d{1,2}:\d{2}:\d{2}|(?:\d+w)?\d+d|\d+w)\b'
+    color: f.orange
+    exclusive: true
+
+  # ── show arp all ──────────────────────────────────────────────────────────
+  - description: ARP entry complete / reachable
+    regex: '(?i)\b(complete|reachable|static)\b'
+    color: f.green
+
+  - description: ARP entry incomplete / stale
+    regex: '(?i)\b(incomplete|stale)\b'
+    color: f.red
+
+  # ── show system info ───────────────────────────────────────────────────────
+  - description: System info field labels
+    regex: '^\s*[a-z][a-z0-9_-]+\s*:'
+    color: f.blue
+
+  - description: System operational status
+    regex: '(?i)\b(operational|normal|degraded|failed)\b'
+    color: f.green
+
+  - description: System failed / degraded status
+    regex: '(?i)\b(failed|degraded|fault)\b'
+    color: f.red bold
+
+  - description: PAN-OS software version
+    regex: '\b\d+\.\d+\.\d+(?:-h\d+)?\b'
+    color: f.gold
+
+  # ── Timestamps / dates (grey) ─────────────────────────────────────────────
+  - description: Syslog / BSD timestamp (MMM DD HH:MM:SS)
+    regex: '\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true
+
+  - description: ISO 8601 datetime
+    regex: '\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true
+
+  - description: Time only (HH:MM:SS)
+    regex: '\b\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+
+  # ── Syslog severity ────────────────────────────────────────────────────────
+  - description: Syslog ERROR severity
+    regex: '\bERROR\b'
+    color: f.red bold
+
+  - description: Syslog WARNING severity
+    regex: '\bWARNING\b'
+    color: f.orange bold
+
+  - description: Syslog INFO / NOTICE severity
+    regex: '\b(INFO|NOTICE)\b'
+    color: f.blue
+
+  # ── yes / no values ────────────────────────────────────────────────────────
+  - description: Boolean yes / enabled
+    regex: "(?<![a-zA-Z0-9_-])(yes|enabled)(?![a-zA-Z0-9_-])"
+    color: f.green
+
+  - description: Boolean no / disabled
+    regex: "(?<![a-zA-Z0-9_-])(no|disabled)(?![a-zA-Z0-9_-])"
+    color: f.red

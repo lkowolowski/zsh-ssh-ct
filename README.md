@@ -1,17 +1,25 @@
 # zsh-ssh-ct
 
-A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output, fuzzy host matching, automatic retry with a single-line status display, host/profile caching with TTL, and rich tab completion.
+A zsh plugin that wraps SSH with [ChromaTerm
+(`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output, fuzzy
+host matching, automatic retry with a single-line status display, host/profile
+caching with TTL, and rich tab completion.
 
 ---
 
 ## Features
 
 - **Profile-based ct configs** — `-j` Juniper, `-c` Cisco, `-p` PAN-OS, `-u` Unix
-- **Ping-before-connect retry loop** — waits up to 60 × 30s for a host to come up; each failed attempt appends a red ✗ to a single status line, replaced with a green ✓ on success
-- **Fuzzy host matching** — resolves partial names against `/etc/hosts`, `~/.ssh/known_hosts`, `~/.ssh/config`, and the local cache
+- **Ping-before-connect retry loop** — waits up to 60 × 30s for a host to come up;
+  each failed attempt appends a red ✗ to a single status line, replaced with a green ✓
+  on success
+- **Fuzzy host matching** — resolves partial names against `/etc/hosts`,
+  `~/.ssh/known_hosts`, `~/.ssh/config`, and the local cache
 - **Exact hostname override** — `-H <host>` bypasses fuzzy matching entirely
-- **Fuzzy confirmation prompt** — opt-in prompt before connecting to a fuzzy-matched host
-- **Host/profile cache with TTL** — remembers recent connections; entries expire after 30 days by default; auto-pruned once per day in the background
+- **Fuzzy confirmation prompt** — opt-in prompt before connecting to a fuzzy-matched
+  host
+- **Host/profile cache with TTL** — remembers recent connections; entries expire
+  after 30 days by default; auto-pruned once per day in the background
 - **Secure cache** — cache directory `700`, cache file `600`
 - **Portable ping** — correct flags detected for macOS and Linux at source time
 - **DNS vs ICMP distinction** — reports DNS failures separately from ping failures
@@ -19,21 +27,46 @@ A zsh plugin that wraps SSH with [ChromaTerm (`ct`)](https://github.com/hSaria/C
 - **Force mode** — `-f` skips ping/DNS checks and tries SSH immediately (useful when ICMP is blocked)
 - **Remote command passthrough** — pass a quoted command after the hostname
 - **Verbose SSH** — `-v` is forwarded to `ssh`
-- **ct is optional** — if ChromaTerm is not installed the plugin falls back to plain `ssh` with no highlighting; all other features (fuzzy matching, retry, caching, completion) continue to work
-- **Smart exit codes** — SSH-level failures (255) are reported; application-level non-zero codes pass through silently
-- **Context-aware tab completion** — hostnames annotated with profile; post-hostname completions offer device-specific commands (`show version`, `uname -a`, etc.)
-- **Completion works regardless of source order** — deferred `compdef` registration means the plugin can be sourced before or after `compinit`
-- **Bundled starter ct YAML configs** for all four device types
+- **ct is optional** — if ChromaTerm is not installed the plugin falls back to plain
+  `ssh` with no highlighting; all other features (fuzzy matching, retry, caching,
+  completion) continue to work
+- **Smart exit codes** — SSH-level failures (255) are reported; application-level
+  non-zero codes pass through silently
+- **Context-aware tab completion** — hostnames annotated with profile; post-hostname
+  completions offer device-specific commands (`show version`, `uname -a`, etc.)
+- **Completion works regardless of source order** — deferred `compdef` registration
+  means the plugin can be sourced before or after `compinit`
+- **Init-commands** — automatically sends platform/host commands after SSH connects
+  via zsh/zpty (zero deps); config-driven with host > platform > defaults cascade;
+  silent skip when no config, no match, or `commands: ["none"]`
+  ([docs](docs/init-commands.md))
+- **Bundled ct highlight configs** — full ct-highlight YAMLs for all four device
+  types in `profiles/` ([docs](docs/ct-highlight.md))
 
 ---
 
 ## Prerequisite
 
-ChromaTerm is optional but recommended. Without it the plugin falls back to plain `ssh` with no highlighting:
+ChromaTerm is optional but recommended. Without it the plugin falls back to plain
+`ssh` with no highlighting:
 
 ```sh
-pip3 install chromaterm
+brew install uv
+uv tool install chromaterm
 ```
+
+### Quick setup
+
+If you have [mise](https://mise.jdx.dev) installed, run this from the repo root
+to copy profiles and create a commented init-commands template:
+
+```sh
+mise run install
+```
+
+This copies the bundled ct highlight YAMLs into `~/.config/chromaterm/` and
+creates `~/.config/zsh-ssh-ct/init-commands.yml` (all lines commented).
+Edit that file to enable init-commands for your devices.
 
 ---
 
@@ -89,7 +122,8 @@ source ~/.zsh/zsh-ssh-ct/zsh-ssh-ct.plugin.zsh
 
 #### Note on `compinit` order (manual installs only)
 
-The plugin handles this automatically. You can source it **before or after** `compinit` and tab completion will work either way:
+The plugin handles this automatically. You can source it **before or after**
+`compinit` and tab completion will work either way:
 
 ```zsh
 # This works:
@@ -101,7 +135,8 @@ autoload -Uz compinit && compinit
 source ~/.zsh/zsh-ssh-ct/zsh-ssh-ct.plugin.zsh
 ```
 
-If `compdef` isn't available at source time, a `precmd` hook fires on the first prompt to register completions, then removes itself.
+If `compdef` isn't available at source time, a `precmd` hook fires on the first
+prompt to register completions, then removes itself.
 
 ---
 
@@ -130,14 +165,16 @@ best scoring candidate from your known hosts / cache.
 
 Set any of these in your `.zshrc` **before** the `source` / `zgenom load` line:
 
-| Variable              | Default                       | Description                                                                               |
-| --------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `_SSH_CT_CONFIG_DIR`  | `$XDG_CONFIG_HOME/chromaterm` | Directory containing ct YAML files (`~/.config/chromaterm` if `XDG_CONFIG_HOME` is unset) |
-| `_SSH_CACHE_FILE`     | `~/.cache/zsh-ssh-ct/hosts`   | Host cache file path                                                                      |
-| `_SSH_MAX_RETRIES`    | `60`                          | Maximum ping retry iterations                                                             |
-| `_SSH_RETRY_SLEEP`    | `30`                          | Seconds between retries                                                                   |
-| `_SSH_CACHE_TTL_DAYS` | `30`                          | Days before cache entries expire (`0` = forever)                                          |
-| `_SSH_FUZZY_CONFIRM`  | `0`                           | Set to `1` to prompt before connecting to fuzzy-matched hosts                             |
+| Variable                      | Default                                         | Description                                                                               |
+| ----------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `_SSH_CT_CONFIG_DIR`          | `$XDG_CONFIG_HOME/chromaterm`                   | Directory containing ct YAML files (`~/.config/chromaterm` if `XDG_CONFIG_HOME` is unset) |
+| `_SSH_CACHE_FILE`             | `~/.cache/zsh-ssh-ct/hosts`                     | Host cache file path                                                                      |
+| `_SSH_MAX_RETRIES`            | `60`                                            | Maximum ping retry iterations                                                             |
+| `_SSH_RETRY_SLEEP`            | `30`                                            | Seconds between retries                                                                   |
+| `_SSH_CACHE_TTL_DAYS`         | `30`                                            | Days before cache entries expire (`0` = forever)                                          |
+| `_SSH_FUZZY_CONFIRM`          | `0`                                             | Set to `1` to prompt before connecting to fuzzy-matched hosts                             |
+| `_SSH_REMOTE_CMDS`            | `$XDG_CONFIG_HOME/zsh-ssh-ct/init-commands.yml` | Init-commands YAML config path ([docs](docs/init-commands.md))                            |
+| `_SSH_INIT_CMD_SKIP_PROFILES` | `u`                                             | Profiles to skip for init-commands (e.g. `"u"`, `"uc"`)                                   |
 
 ### Example `.zshrc`
 
@@ -170,43 +207,32 @@ The cache is also auto-pruned silently in the background at most once per day.
 
 ---
 
-## ct highlight configs
-
-This plugin uses [ct-highlight](https://github.com/lkowolowski/ct-highlight) for
-ChromaTerm highlight rules. Clone that repo and point `_SSH_CT_CONFIG_DIR` at it:
-
-```zsh
-git clone https://github.com/lkowolowski/ct-highlight \
-    "${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-
-# In your .zshrc (before loading the plugin):
-export _SSH_CT_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-```
-
-The plugin expects the following files in `_SSH_CT_CONFIG_DIR`:
-
-| File          | Profile flag | Device type                                               |
-| ------------- | ------------ | --------------------------------------------------------- |
-| `generic.yml` | —            | Catch-all — used when no profile-specific config is found |
-| `juniper.yml` | `-j`         | Juniper JunOS                                             |
-| `cisco.yml`   | `-c`         | Cisco IOS / IOS-XE / NX-OS                                |
-| `panos.yml`   | `-p`         | Palo Alto PAN-OS                                          |
-| `unix.yml`    | `-u`         | Linux / Unix                                              |
-
-The `ct/` directory in this repo contains minimal starter configs if you want
-to use this plugin without ct-highlight.
-
----
-
 ## Known limitations
 
-**Completion cache is per-session** — `~/.ssh/known_hosts` is parsed once per shell session and cached in memory, invalidated only when the file's mtime changes. If you SSH to a new host in one terminal and want it to appear in completions in another, open a new shell or run `_ssh_cache_clear` to force a refresh.
+**Completion cache is per-session** — `~/.ssh/known_hosts` is parsed once per shell
+session and cached in memory, invalidated only when the file's mtime changes. If you
+SSH to a new host in one terminal and want it to appear in completions in another,
+open a new shell or run `_ssh_cache_clear` to force a refresh.
 
-**Auto-prune races are unlikely but possible** — the daily prune runs in a background subshell. On a slow filesystem, a rapid `_ssh` invocation immediately after shell startup could theoretically overlap with the prune writing the cache file. The `mv -f` atomic replace makes actual corruption very unlikely, but if you ever see an empty or truncated cache, run `_ssh_cache_clear` to reset it.
+**Auto-prune races are unlikely but possible** — the daily prune runs in a background
+subshell. On a slow filesystem, a rapid `_ssh` invocation immediately after shell
+startup could theoretically overlap with the prune writing the cache file. The `mv
+-f` atomic replace makes actual corruption very unlikely, but if you ever see an
+empty or truncated cache, run `_ssh_cache_clear` to reset it.
 
-**`ct` must be on `$PATH` at call time** — the plugin checks for `ct` when you run `_ssh`, not at shell startup. If `ct` is installed inside a virtualenv or added to `$PATH` by a lazy loader, it will work as long as it's available by the time you invoke `_ssh`. If it isn't found, you'll get a clear error with install instructions.
+**`ct` must be on `$PATH` at call time** — the plugin checks for `ct` when you run
+`_ssh`, not at shell startup. If `ct` is installed inside a virtualenv or added to
+`$PATH` by a lazy loader, it will work as long as it's available by the time you
+invoke `_ssh`. If it isn't found, you'll get a clear error with install instructions.
 
 ---
+
+## Further reading
+
+- **Init-commands** — [docs/init-commands.md](docs/init-commands.md) — full schema,
+  layering, gating
+- **ct highlight configs** — [docs/ct-highlight.md](docs/ct-highlight.md) — setup,
+  profiles, customization
 
 ## File layout
 
@@ -215,6 +241,16 @@ to use this plugin without ct-highlight.
 ├── lib/
 │   ├── cache.zsh           ← cache read/write/TTL/prune/display
 │   ├── core.zsh            ← _ssh(), fuzzy match, ping, retry loop, usage
-│   └── complete.zsh        ← tab completion with deferred compdef registration
+│   ├── complete.zsh        ← tab completion with deferred compdef registration
+│   └── init.zsh            ← init-commands via zsh/zpty
+├── profiles/               ← full ct-highlight YAMLs (generic, juniper, cisco, panos, unix)
+├── configs/
+│   └── init-commands.yml   ← starter init-commands config
+├── docs/
+│   ├── init-commands.md    ← init-commands reference
+│   ├── ct-highlight.md     ← ct highlight config reference
+│   └── ADR/                ← architecture decision records
+│       ├── 001-zsh-zpty-mechanism.md
+│       └── 002-single-file-config-path.md
 └── README.md
 ```

@@ -1,0 +1,103 @@
+# mise.toml — task runner for local linting and validation
+# Usage:
+#   mise run lint          run all linters
+#   mise run shellcheck    shellcheck on all .zsh files
+#   mise run zsh-check     zsh -n syntax check on all .zsh files
+#   mise run yamllint      yamllint on all .yml files
+#   mise run markdownlint  markdownlint on all .md files
+#   mise run pre-commit    run all pre-commit hooks
+#   mise run install       copy profiles + create init-commands config
+
+[tasks.lint]
+description = "Run all linters"
+depends = ["shellcheck", "zsh-check", "yamllint", "markdownlint"]
+
+[tasks.shellcheck]
+description = "ShellCheck on all .zsh files"
+run = "shellcheck --severity=warning --color=always $(find . -name '*.zsh' -not -path './.git/*')"
+
+[tasks.zsh-check]
+description = "zsh -n syntax check on all .zsh files"
+run = """\
+for f in $(find . -name '*.zsh' -not -path './.git/*'); do
+	zsh -n "$f" && echo "  ok  $f" || exit 1
+done
+"""
+
+[tasks.yamllint]
+description = "yamllint on all .yml files"
+run = "yamllint -c .yamllint.yml $(find . -name '*.yml' -not -name '.pre-commit-config.yaml' -not -path './.git/*')"
+
+[tasks.markdownlint]
+description = "markdownlint on all .md files"
+run = "markdownlint --config .markdownlint.yml $(find . -name '*.md' -not -path './.git/*')"
+
+[tasks.pre-commit]
+description = "Run all pre-commit hooks against every file"
+run = "pre-commit run --all-files"
+
+[tasks.test]
+description = "Alias for lint"
+depends = ["lint"]
+
+[tasks.install]
+description = "Copy profiles to _SSH_CT_CONFIG_DIR and create init-commands config"
+run = """\
+ct_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
+mkdir -p "${ct_dir}"
+cp -n profiles/*.yml "${ct_dir}/" 2>/dev/null && echo "[_ssh] Profiles copied to ${ct_dir}" || echo "[_ssh] Profiles up to date"
+
+rc_file="${XDG_CONFIG_HOME:-${HOME}/.config}/zsh-ssh-ct/init-commands.yml"
+mkdir -p "$(dirname "${rc_file}")"
+if [ ! -f "${rc_file}" ]; then
+  cat << 'INSTALL_EOF' > "${rc_file}"
+# Init-commands configuration for zsh-ssh-ct
+# Path defined by _SSH_REMOTE_CMDS env var
+# (default: ~/.config/zsh-ssh-ct/init-commands.yml)
+#
+# Uncomment sections to enable init-commands for your devices.
+# Full schema: https://github.com/lkowolowski/zsh-ssh-ct/blob/main/docs/init-commands.md
+
+#defaults:
+#  timeout: 5
+#  prompt: '[>#$]'
+#  commands: []
+
+#platforms:
+#  juniper:
+#    prompt: '([>%]|\\]#)[[:space:]]*$'
+#    timeout: 10
+#    commands:
+#      - "set cli screen-length 0"
+#      - "set cli timestamp"
+#  cisco:
+#    prompt: '[#>]'
+#    commands:
+#      - "term length 0"
+#      - "term width 0"
+#  panos:
+#    prompt: '[>#$]'
+#    commands:
+#      - "set cli pager off"
+#      - "set session timeout 0"
+#  unix:
+#    prompt: '[#$]'
+
+#hosts:
+#  # Uncomment and replace with your device hostnames:
+#  # core-router:
+#  #   platform: juniper
+#  #   prompt: 'custom>$'
+#  #   timeout: 15
+#  #   commands:
+#  #     - "show configuration | display set"
+#  # backup-router:
+#  #   platform: juniper
+#  #   commands: ["none"]
+INSTALL_EOF
+  echo "[_ssh] Created ${rc_file}"
+  echo "[_ssh] Edit it to enable init-commands for your devices"
+else
+  echo "[_ssh] ${rc_file} already exists — skipping"
+fi
+"""

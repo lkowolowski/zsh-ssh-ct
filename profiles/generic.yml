@@ -1,0 +1,71 @@
+# ChromaTerm default highlight rules
+# Used when no profile is specified or the specified profile does not exist.
+# Covers universally useful patterns: addresses, URLs, timestamps.
+#
+# Palette matches the shared semantic palette used across all profiles
+# so output looks consistent when switching between profiles:
+#   gold    #e5c07b  network addresses (IPv4, IPv6, MAC)
+#   cyan    #56b6c2  URLs
+#   grey    #7c8fa0  timestamps / dates
+#
+# Rule ordering: more specific patterns first so exclusive correctly
+# protects complex tokens (MAC, IPv6) from being fragmented by simpler ones.
+
+palette:
+  gold: "#e5c07b"
+  cyan: "#56b6c2"
+  grey: "#7c8fa0"
+
+rules:
+  # ── URLs (cyan) ────────────────────────────────────────────────────────────
+  # Match before IPv4 so http://1.2.3.4/path is caught as a whole URL
+  - description: URL (http / https)
+    regex: 'https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&''()*+,;=%]+'
+    color: f.cyan
+    exclusive: true
+
+  # ── MAC addresses (gold) ──────────────────────────────────────────────────
+  # Match before IPv4/IPv6 — MAC octets contain digits that IPv4 would grab
+  - description: MAC address (colon-separated)
+    regex: '\b[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}\b'
+    color: f.gold
+    exclusive: true
+
+  - description: MAC address (Cisco dotted notation)
+    regex: '\b[0-9a-fA-F]{4}\.[0-9a-fA-F]{4}\.[0-9a-fA-F]{4}\b'
+    color: f.gold
+    exclusive: true
+
+  # ── IPv6 addresses (gold underline) ───────────────────────────────────────
+  # Requires :: or a hex letter to distinguish from HH:MM:SS time strings
+  - description: IPv6 address (with optional prefix length or zone ID)
+    regex: '(?:::(?:[0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{0,4}|(?:[0-9a-fA-F]{1,4}:)+:[0-9a-fA-F]{0,4}|[0-9a-fA-F]*[a-fA-F][0-9a-fA-F]*(?::[0-9a-fA-F]{0,4}){1,7})(?:%[a-z][a-z0-9]*)?(?:/\d{1,3})?'
+    color: f.gold underline
+    exclusive: true
+
+  # ── IPv4 addresses (gold underline) ───────────────────────────────────────
+  - description: IPv4 address (with optional prefix length)
+    regex: '\b(25[0-5]|2[0-4]\d|[01]?\d{1,2})(\.(25[0-5]|2[0-4]\d|[01]?\d{1,2})){3}(/[0-9]{1,2})?\b'
+    color: f.gold underline
+    exclusive: true
+
+  # ── Timestamps and dates (grey) ───────────────────────────────────────────
+  - description: Syslog / BSD timestamp (MMM DD HH:MM:SS)
+    regex: '\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true
+
+  - description: ISO 8601 datetime (YYYY-MM-DD HH:MM:SS or YYYY-MM-DDTHH:MM:SS)
+    regex: '\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true
+
+  - description: Apache / common log date (DD/Mon/YYYY:HH:MM:SS)
+    regex: '\b\d{2}/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/\d{4}:\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true
+
+  - description: Time only (HH:MM:SS)
+    regex: '\b\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+    exclusive: true

@@ -1,0 +1,629 @@
+# ChromaTerm highlight rules for JunOS
+# Translated from https://github.com/lkowolowski/junos.vim/blob/master/syntax/junos.vim
+# Extended with show command output patterns (show interfaces, show route,
+# show bgp, show chassis, show log, show arp, show lldp).
+#
+# Shared semantic palette (normalized with cisco.yml):
+#   red       #e06c75  errors, deny, reject, down, idle, major alarms
+#   orange    #d19a66  warnings, BGP active/connect, minor alarms, secondary values
+#   gold      #e5c07b  MAC addresses, IPv4 addresses, route table headers, stanza labels
+#   green     #98c379  up/connected/permit/accept/established/complete/no-shut
+#   cyan      #56b6c2  interface types, protocols, LLDP neighbor hostnames
+#   blue      #61afef  primary keywords, field labels, via
+#   lightblue #00afff  routing-instance root keyword (equiv. to Cisco vrf)
+#   purple    #c678dd  config keywords, LLDP capabilities, route metrics, rates
+#   grey      #7c8fa0  comments, timestamps, TTL, last-cleared, numeric values
+#   white     #eeeeee  permission list values
+#
+# Word boundary note: keyword rules use (?<![a-zA-Z0-9_-]) and (?![a-zA-Z0-9_-])
+# instead of \b so that short keywords (access, flow, route, zone, etc.) do not
+# match inside hyphenated compound words like access-group, flow-tap, to-zone.
+
+palette:
+  red: "#e06c75"
+  orange: "#d19a66"
+  gold: "#e5c07b"
+  green: "#98c379"
+  cyan: "#56b6c2"
+  blue: "#61afef"
+  lightblue: "#00afff"
+  purple: "#c678dd"
+  grey: "#7c8fa0"
+  white: "#eeeeee"
+
+rules:
+  # ── Comments / descriptions ────────────────────────────────────────────────
+  - description: JunOS description keyword
+    regex: \bdescription\s
+    color: f.blue
+
+  - description: JunOS description text
+    regex: 'description\s+(.*$)'
+    color:
+      1: f.orange italic
+
+  - description: JunOS inline comment (#)
+    regex: \s*#.*$
+    color: f.grey italic
+
+  # ── Quoted strings (exclusive — nothing recolours inside quotes) ───────────
+  - description: JunOS quoted string
+    regex: '"[^"]*"'
+    color: f.green
+    exclusive: true
+
+  # ── Numeric values (grey — noise, not signal) ─────────────────────────────
+  - description: JunOS numeric value
+    regex: \b\d+\b
+    color: f.grey
+
+  - description: JunOS low/high keywords
+    regex: "(?<![a-zA-Z0-9_-])(low|high)(?![a-zA-Z0-9_-])"
+    color: f.grey
+
+  # ── IPv4 addresses (gold underline) ───────────────────────────────────────
+  - description: JunOS IPv4 address (with optional prefix length)
+    regex: \b(25[0-5]|2[0-4]\d|[01]?\d{1,2})(\.(25[0-5]|2[0-4]\d|[01]?\d{1,2})){3}(/[0-9]{1,2})?\b
+    color: f.gold underline
+    exclusive: true
+
+  # ── show interfaces descriptions — columnar description field ─────────────
+  # Must appear BEFORE interface name rules so exclusive wins on any interface
+  # names appearing inside the description text (e.g. ge-0/0/7 in description)
+  - description: Interface description — admin up / link up
+    regex: '(up)\s+(up)\s+(\S.*?)$'
+    color:
+      1: f.green
+      2: f.green
+      3: f.orange italic
+    exclusive: true
+
+  - description: Interface description — admin up / link down
+    regex: '(up)\s+(down)\s+(\S.*?)$'
+    color:
+      1: f.green
+      2: f.red bold
+      3: f.orange italic
+    exclusive: true
+
+  - description: Interface description — admin down / link down
+    regex: '(down)\s+(down)\s+(\S.*?)$'
+    color:
+      1: f.red bold
+      2: f.red bold
+      3: f.orange italic
+    exclusive: true
+
+  - description: Interface description — other state combinations with description
+    regex: '(?:up|down|unknown|absent|testing)\s+(?:up|down|unknown|absent|testing)\s+(\S.*?)$'
+    color:
+      1: f.orange italic
+    exclusive: true
+
+  # ── Interface names (cyan underline) ──────────────────────────────────────
+  - description: JunOS physical interfaces (et/xe/ge/vcp/gr)
+    regex: \b(et|xe|ge|vcp|gr)-\d+/\d+/\d+(\.\d+)?
+    color: f.cyan underline
+    exclusive: true
+
+  - description: JunOS logical interfaces (ae/reth/fab/lo)
+    regex: \b(ae|reth|fab|lo)\d+(\.\d+)?
+    color: f.cyan underline
+    exclusive: true
+
+  - description: JunOS IRB and st0 interfaces
+    regex: \b(st0|irb)(\.\d+)?
+    color: f.cyan underline
+    exclusive: true
+
+  - description: JunOS virtual-chassis / vme interfaces
+    regex: \b(virtual-chassis|vme)\b
+    color: f.cyan underline
+    exclusive: true
+
+  - description: JunOS vlan sub-interface (e.g. vlan.2, vlan.100)
+    regex: \bvlan\.\d+
+    color: f.cyan underline
+    exclusive: true
+
+  # ── permissions [ ... ] block (white values) ──────────────────────────────
+  # Must appear before stanza/keyword rules so exclusive wins on permission
+  # values that are also keywords (firewall, security, system, interface, etc.)
+  - description: JunOS permissions keyword
+    regex: \bpermissions\b
+    color: f.purple
+
+  - description: JunOS permissions list values
+    regex: '\bpermissions\s+\[([^\]]+)\]'
+    color:
+      1: f.white
+    exclusive: true
+
+  # ── Top-level stanza labels (gold) ────────────────────────────────────────
+  - description: JunOS top-level stanza labels
+    regex: "(?<![a-zA-Z0-9_-])(system|chassis|firewall|security|rule|rule-set|pool)(?![a-zA-Z0-9_-])"
+    color: f.gold
+
+  # ── routing-instance (equivalent to Cisco vrf) ────────────────────────────
+  - description: routing-instance / routing-instances root keyword
+    regex: \brouting-instances?\b
+    color: f.lightblue
+
+  - description: routing-instance name (token following routing-instance keyword)
+    regex: '(?<=routing-instance )\S+'
+    color: f.cyan bold
+
+  - description: routing-instance sub-keywords
+    regex: \b(instance-type|vrf-target|vrf-import|vrf-export|vrf-table-label|route-distinguisher)\b
+    color: f.purple
+
+  # ── Configuration keywords (purple) ───────────────────────────────────────
+  - description: JunOS configuration keywords
+    regex: "(?<![a-zA-Z0-9_-])(version|server|class|user|route|nat|policy|vlan-id|mtu|filter|term|routing-engine|line-card|next-hop|cluster|vrrp-group|security-zone|time-zone|encapsulation|storm-control|alg|log|login|node|zone|path|community)(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: JunOS interfaces keyword
+    regex: "(?<![a-zA-Z0-9_-])interfaces?(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: JunOS vlans keyword
+    regex: '(?<![a-zA-Z0-9_-])vlans?(?!\.\d)(?![a-zA-Z0-9_-])'
+    color: f.purple
+
+  - description: JunOS members keyword
+    regex: "(?<![a-zA-Z0-9_-])members?(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  - description: JunOS applications keyword
+    regex: "(?<![a-zA-Z0-9_-])applications?(?![a-zA-Z0-9_-])"
+    color: f.purple
+
+  # ── Conditional / zone match keywords (cyan) ──────────────────────────────
+  - description: JunOS conditional / zone keywords
+    regex: "(?<![a-zA-Z0-9_-])(if|else|for-each|to-zone|from-zone|match|then|from|to)(?![a-zA-Z0-9_-])"
+    color: f.cyan
+
+  # ── Protocols (cyan) ───────────────────────────────────────────────────────
+  - description: JunOS L3/L4 protocols
+    regex: "(?<![a-zA-Z0-9_-])(ip|ipv6|inet|inet6|tcp|udp)(?![a-zA-Z0-9_-])"
+    color: f.cyan
+
+  - description: JunOS management and service protocols
+    regex: \b(snmp|snmptrap|ntp|syslog|ssh-ed25519|ssh-ecdsa|ssh-rsa|ssh|ftp|ftp-data|dns|sql)\b
+    color: f.cyan
+
+  - description: JunOS routing protocols
+    regex: \b(ospf|ospf3|rip|ripng|isis)\b
+    color: f.cyan
+
+  - description: JunOS layer-2 / multicast protocols
+    regex: \b(igmp|igmp-snooping|lldp|lldp-med|mld|mld-snooping|msdp|mstp|mvrp|mpls|vpls|vrrp|lacp|stp|sflow|vstp|dot1x|msrp|msrpc|sunrpc|icmp|ping|pim|rstp|rsvp|netconf)\b
+    color: f.cyan
+
+  - description: JunOS BGP (eBGP/iBGP)
+    regex: \b[ie]?bgp\b
+    color: f.cyan
+
+  - description: JunOS HTTP/HTTPS
+    regex: \bhttps?\b
+    color: f.cyan
+
+  - description: JunOS 802.3ad / 802.1Q
+    regex: \b802\.(3ad|1Q)\b
+    color: f.cyan
+
+  - description: JunOS built-in junos- application names
+    regex: \bjunos-[-a-z]+
+    color: f.cyan
+
+  # ── Policy actions — permit/deny split (green / red) ──────────────────────
+  - description: JunOS permit / accept / enable actions
+    regex: "(?<![a-zA-Z0-9_-])(permit|accept|enable)(?![a-zA-Z0-9_-])"
+    color: f.green
+
+  - description: JunOS deny / reject / discard / disable actions
+    regex: "(?<![a-zA-Z0-9_-])(any|deny|reject|discard|disable)(?![a-zA-Z0-9_-])"
+    color: f.red
+
+  # ── Operational / configure mode verbs (blue) ─────────────────────────────
+  - description: JunOS operational / configure mode verbs
+    regex: "(?<![a-zA-Z0-9_-])(set|delete|rename|insert|request|show)(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: JunOS interface/port mode keywords
+    regex: "(?<![a-zA-Z0-9_-])(trunk|access|static|track|standby|full-duplex|automatic|auto-negotiation|input|output|prefer|active|passive|link-mode|port-mode|speed|queue)(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: JunOS speed shorthand (e.g. 1g, 100m)
+    regex: \b\d+[gm]\b
+    color: f.blue
+
+  # ── Functional / structural keywords (blue) ───────────────────────────────
+  - description: JunOS functional / structural keywords
+    regex: "(?<![a-zA-Z0-9_-])(redundancy-group|screen|policies|flow|zones|vrf|virtual-router|id|host-name|host|priority|weight|port|protocol|source-address|destination-address|source-port|destination-port|import|export|source|destination|primary|secondary|neighbor)(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: JunOS groups keyword
+    regex: "(?<![a-zA-Z0-9_-])groups?(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: JunOS protocols keyword
+    regex: "(?<![a-zA-Z0-9_-])protocols?(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: JunOS unit stanza (e.g. "unit 0")
+    regex: \bunit\s+\d+
+    color: f.blue
+
+  - description: JunOS node reference (e.g. node0, node1)
+    regex: \bnode\d+
+    color: f.blue
+
+  # ── Definition token — uppercase identifier in config context (gold) ────────
+  - description: JunOS definition token (leading uppercase identifier)
+    regex: '^(?:\s+)[a-z][\w-]*\s+([A-Z]\S+)'
+    color:
+      1: f.gold
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # show command output rules
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── MAC addresses (gold) ──────────────────────────────────────────────────
+  - description: MAC address (colon-separated)
+    regex: '\b[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}\b'
+    color: f.gold
+    exclusive: true
+
+  # ── Physical / logical interface status ───────────────────────────────────
+  - description: Physical interface header label
+    regex: "Physical interface:"
+    color: f.blue
+
+  - description: Logical interface header label
+    regex: "Logical interface"
+    color: f.blue
+
+  - description: Current address / Hardware address field labels (show interfaces)
+    regex: '\b(Current|Hardware) address'
+    color: f.blue
+
+  - description: Physical link Up / Enabled
+    regex: '(?:Physical link is Up|(?<!\w)Enabled(?!\w))'
+    color: f.green
+
+  - description: Physical link Down / Administratively down
+    regex: "(?:Physical link is Down|Administratively down)"
+    color: f.red bold
+
+  - description: Link is Up (short form)
+    regex: '\bLink is Up\b'
+    color: f.green
+
+  - description: Link is Down (short form)
+    regex: '\bLink is Down\b'
+    color: f.red bold
+
+  - description: Interface disabled / deactivated / inactive states
+    regex: '(?i)\b(?:disabled|deactivated|inactive|deactivate)\b'
+    color: f.red bold
+
+  # ── Interface speed / traffic rates (purple — metrics, not keywords) ────────
+  - description: Interface speed (e.g. 1000mbps, 10Gbps)
+    regex: '\b\d+(?:[mMgG])bps\b'
+    color: f.purple
+
+  - description: Bit rate (bps)
+    regex: '\b\d+ bps\b'
+    color: f.purple
+
+  - description: Packet rate (pps)
+    regex: '\b\d+ pps\b'
+    color: f.purple
+
+  # ── Non-zero error counters (red bold) ────────────────────────────────────
+  - description: Non-zero Errors counter
+    regex: 'Errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Drops counter
+    regex: 'Drops: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Framing errors
+    regex: 'Framing errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Runts
+    regex: 'Runts: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Giants
+    regex: 'Giants: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Policed discards
+    regex: 'Policed discards: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Resource errors
+    regex: 'Resource errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero L3 incompletes
+    regex: 'L3 incompletes: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero L2 channel errors
+    regex: 'L2 channel errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero L2 mismatch timeouts
+    regex: 'L2 mismatch timeouts: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero FIFO errors
+    regex: 'FIFO errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero MTU errors
+    regex: 'MTU errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero Aged packets
+    regex: 'Aged packets: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero HS link CRC errors
+    regex: 'HS link CRC errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Non-zero SRAM errors
+    regex: 'SRAM errors: [1-9]\d*'
+    color: f.red bold
+
+  - description: Carrier transitions (non-zero — indicates flapping)
+    regex: 'Carrier transitions: [1-9]\d*'
+    color: f.red bold
+
+  # ── Active alarms and defects ─────────────────────────────────────────────
+  - description: Active alarms label
+    regex: 'Active alarms\s*:'
+    color: f.orange
+
+  - description: Active defects label
+    regex: 'Active defects\s*:'
+    color: f.orange
+
+  - description: Alarm / defect value (non-None)
+    regex: 'Active (?:alarms|defects)\s*:\s+(?!None\b)([A-Z][A-Z0-9_-]+)'
+    color:
+      1: f.red bold
+
+  - description: No alarms / defects (None)
+    regex: '\bNone\b'
+    color: f.green
+
+  - description: BPDU or MAC-REWRITE error (non-None)
+    regex: '(?:BPDU Error|MAC-REWRITE Error): (?!None)\S+'
+    color: f.red bold
+
+  # ── Last flapped / statistics cleared (grey italic) ───────────────────────
+  - description: Last flapped Never (stable interface)
+    regex: 'Last flapped\s*:\s*Never'
+    color: f.green italic
+
+  - description: Last flapped label and timestamp
+    regex: 'Last flapped\s*:.*$'
+    color: f.grey italic
+
+  - description: Statistics last cleared line
+    regex: "Statistics last cleared:.*$"
+    color: f.grey italic
+
+  # ── show ethernet-switching table / interfaces ───────────────────────────
+  - description: Ethernet-switching VLAN name column
+    regex: '\bvlan\d+\b'
+    color: f.purple
+
+  - description: Ethernet-switching interface state up
+    regex: '(?<=\s)\bup\b(?=\s)'
+    color: f.green
+
+  - description: Ethernet-switching interface state down
+    regex: '(?<=\s)\bdown\b(?=\s)'
+    color: f.red bold
+
+  - description: Ethernet-switching tagging state
+    regex: "(?<![a-zA-Z0-9_-])(tagged|untagged)(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: Ethernet-switching blocking state — unblocked
+    regex: '\bunblocked\b'
+    color: f.green
+
+  - description: Ethernet-switching blocking state — blocked
+    regex: '\bblocked\b'
+    color: f.red bold
+
+  - description: Ethernet-switching entry type Learn
+    regex: '\bLearn\b'
+    color: f.green
+    exclusive: true
+
+  - description: Ethernet-switching entry type Static
+    regex: '\bStatic\b'
+    color: f.blue
+    exclusive: true
+
+  - description: Ethernet-switching entry type Flood
+    regex: '\bFlood\b'
+    color: f.cyan
+    exclusive: true
+
+  - description: Ethernet-switching flood interface All-members
+    regex: '\bAll-members\b'
+    color: f.grey
+
+  # ── show route output ─────────────────────────────────────────────────────
+  - description: Route table header (inet.0 / inet6.0 / mpls.0 / etc.)
+    regex: '\b\w+\.\d+:'
+    color: f.gold bold
+
+  # ── show spanning-tree interface ──────────────────────────────────────────
+  # Bridge ID format: priority.macaddress (e.g. 4096.64649b37eb41)
+  - description: STP bridge ID (priority.mac)
+    regex: '\b\d+\.[0-9a-fA-F]{12}\b'
+    color: f.gold
+    exclusive: true
+
+  # Port ID format: priority:portnum (e.g. 128:513)
+  # Route age rule must appear first — exclusive prevents STP port ID
+  # from matching HH:MM components of time strings like 02:43:53
+  - description: Route / adjacency age (1w3d 02:43:53 / 3d 14:22 / 02:43:53)
+    regex: '\b(?:(?:\d+w)?(?:\d+d)?\s*\d{1,2}:\d{2}:\d{2}|(?:\d+w)?\d+d|\d+w)\b'
+    color: f.orange
+    exclusive: true
+
+  - description: STP port ID (priority:port — first value is port priority 0-240 or bridge priority)
+    regex: '\b(?:0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240|4096|8192|12288|16384|20480|24576|28672|32768|36864|40960|45056|49152|53248|57344|61440):\d{1,5}\b'
+    color: f.purple
+    exclusive: true
+
+  - description: STP state forwarding (FWD)
+    regex: '\bFWD\b'
+    color: f.green bold
+
+  - description: STP state discarding / disabled (DIS / BLK)
+    regex: '\b(DIS|BLK)\b'
+    color: f.red bold
+
+  - description: STP role designated / root / alternate / backup
+    regex: '\b(DESG|ROOT|ALTN|BACK|MSTR)\b'
+    color: f.cyan
+
+  - description: Routing-instance name in route table header (instance-name.inet.0)
+    regex: '(?<=table )\S+(?=\.)'
+    color: f.cyan bold
+
+  - description: Active best route marker (*)
+    regex: '^\*'
+    color: f.green bold
+
+  - description: Route protocol tags
+    regex: '\b(Direct|Local|BGP|OSPF|OSPF3|IS-IS|RIP|LDP|RSVP|Aggregate|Access)\b'
+    color: f.cyan
+
+  - description: Next-hop via keyword
+    regex: "(?<![a-zA-Z0-9_-])via(?![a-zA-Z0-9_-])"
+    color: f.blue
+
+  - description: Route preference and metric block
+    regex: '\[(?:BGP|OSPF|IS-IS|Static|Direct|Local|RIP|LDP|RSVP|Aggregate)\/\d+(?:\/\d+)?\]'
+    color: f.purple
+
+  # ── show bgp summary ──────────────────────────────────────────────────────
+  - description: BGP session Established
+    regex: '\bEstablished\b'
+    color: f.green
+
+  - description: BGP session Active / Connect / OpenSent / OpenConfirm
+    regex: '\b(Active|Connect|OpenSent|OpenConfirm)\b'
+    color: f.orange
+
+  - description: BGP session Idle
+    regex: '\bIdle\b'
+    color: f.red
+
+  # ── show ospf neighbor / show ospf3 neighbor ──────────────────────────────
+  - description: OSPF neighbor state Full / 2Way
+    regex: '\b(Full|2Way)\b'
+    color: f.green
+
+  - description: OSPF neighbor state in progress
+    regex: '\b(ExStart|Exchange|Loading|Init|Attempt)\b'
+    color: f.orange
+
+  - description: OSPF neighbor state Down
+    regex: '\bDown\b'
+    color: f.red
+
+  # ── show chassis alarms ───────────────────────────────────────────────────
+  - description: Chassis alarm — Major severity
+    regex: '\bMajor\b'
+    color: f.red bold
+
+  - description: Chassis alarm — Minor severity
+    regex: '\bMinor\b'
+    color: f.orange bold
+
+  - description: No alarms currently active
+    regex: '\bNo alarms currently active\b'
+    color: f.green
+
+  # ── show log (syslog) ─────────────────────────────────────────────────────
+  - description: Syslog ERROR severity
+    regex: '\bERROR\b'
+    color: f.red bold
+
+  - description: Syslog WARNING severity
+    regex: '\bWARNING\b'
+    color: f.orange bold
+
+  - description: Syslog NOTICE / INFO severity
+    regex: '\b(NOTICE|INFO)\b'
+    color: f.blue
+
+  - description: Syslog timestamp (MMM DD HH:MM:SS)
+    regex: '\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b'
+    color: f.grey
+
+  # ── show arp / show ipv6 neighbors ────────────────────────────────────────
+  - description: ARP/NDP entry Complete / Reachable
+    regex: '\b(Complete|Reachable)\b'
+    color: f.green
+
+  - description: ARP/NDP entry Incomplete / Stale / Delay / Probe / Unreachable
+    regex: '\b(Incomplete|Stale|Delay|Probe|Unreachable)\b'
+    color: f.red
+
+  # ── show lldp neighbors / show lldp neighbors detail ─────────────────────
+  - description: LLDP section header
+    regex: "LLDP Neighbor Information:"
+    color: f.blue bold
+
+  - description: LLDP summary column headers
+    regex: '^(?:Local Interface|Parent Interface|Chassis Id|Port info|System Name)\s'
+    color: f.blue underline
+
+  - description: LLDP neighbor system name (last column — must contain dot or hyphen)
+    regex: '(?<=\s{2})[a-zA-Z][a-zA-Z0-9][\w]*[.\-][\w\.\-]+(?=\s*$)'
+    color: f.cyan bold
+
+  - description: LLDP chassis ID (non-MAC form)
+    regex: 'Chassis ID\s*:\s+([^\s].*$)'
+    color:
+      1: f.gold
+
+  - description: LLDP detail — field labels
+    regex: '^\s+(?:System name|System description|Port description|Port ID|Chassis ID|System capabilities|Enabled capabilities|Auto negotiation|Physical media capabilities|Link aggregation|Maximum frame size)\s*:'
+    color: f.blue
+
+  - description: LLDP detail — system name value
+    regex: 'System name\s*:\s+(.*$)'
+    color:
+      1: f.cyan bold
+
+  - description: LLDP detail — port / system description value
+    regex: '(?:Port|System) description\s*:\s+(.*$)'
+    color:
+      1: f.grey italic
+
+  - description: LLDP capabilities (Router / Bridge / etc.)
+    regex: '(?:System capabilities|Enabled capabilities)\s*:\s*(.*$)'
+    color:
+      1: f.purple
+
+  - description: LLDP TTL / age
+    regex: 'Time to live\s*:\s*\d+.*$'
+    color: f.grey

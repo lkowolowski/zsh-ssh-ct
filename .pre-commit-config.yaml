@@ -63,19 +63,12 @@ repos:
       - id: markdownlint
         args: [--config, .markdownlint.yml]
 
-  # ── checkmake — Makefile linter ──────────────────────────────────────────
-  # Built in pre-commit's sandbox — no system install required.
-  - repo: https://github.com/checkmake/checkmake.git
-    rev: v0.3.0
-    hooks:
-      - id: checkmake
-
-  # ── All linting — delegated to make lint ─────────────────────────────────
+  # ── All linting — delegated to mise ─────────────────────────────────────
   - repo: local
     hooks:
-      - id: make-lint
-        name: make lint
+      - id: mise-lint
+        name: mise run lint
         language: system
-        entry: make lint
+        entry: mise run lint
         pass_filenames: false
         always_run: true

@@ -17,6 +17,17 @@ _ssh_epoch() {
 }
 
 # ---------------------------------------------------------------------------
+# TTL cutoff helper — epoch timestamp before which entries are considered
+# stale. Shared by _ssh_cache_hosts, _ssh_cache_hosts_annotated, and
+# _ssh_cache_prune so the TTL math lives in exactly one place.
+# ---------------------------------------------------------------------------
+_ssh_cache_cutoff() {
+    local now
+    now="$(_ssh_epoch)"
+    print -- $(( now - _SSH_CACHE_TTL_DAYS * 86400 ))
+}
+
+# ---------------------------------------------------------------------------
 # Cache init — creates directory + file with secure permissions
 # ---------------------------------------------------------------------------
 _ssh_cache_init() {
@@ -123,10 +134,8 @@ _ssh_cache_hosts() {
     local profile="${1:-}"
     _ssh_cache_init
 
-    local now ttl_secs cutoff
-    now="$(_ssh_epoch)"
-    ttl_secs=$(( _SSH_CACHE_TTL_DAYS * 86400 ))
-    cutoff=$(( now - ttl_secs ))
+    local cutoff
+    cutoff="$(_ssh_cache_cutoff)"
 
     while IFS=: read -r h p ts; do
         [[ -z "${h}" ]] && continue
@@ -145,10 +154,8 @@ _ssh_cache_hosts_annotated() {
     local profile="${1:-}"
     _ssh_cache_init
 
-    local now ttl_secs cutoff
-    now="$(_ssh_epoch)"
-    ttl_secs=$(( _SSH_CACHE_TTL_DAYS * 86400 ))
-    cutoff=$(( now - ttl_secs ))
+    local cutoff
+    cutoff="$(_ssh_cache_cutoff)"
 
     while IFS=: read -r h p ts; do
         [[ -z "${h}" ]] && continue
@@ -157,18 +164,6 @@ _ssh_cache_hosts_annotated() {
         local label="${_SSH_PROFILE_NAMES[$p]:-unknown}"
         printf '%s\t(%s)\n' "${h}" "${label}"
     done < "${_SSH_CACHE_FILE}"
-}
-
-# ---------------------------------------------------------------------------
-# Get the most recently used profile flag for a given host.
-# Usage: _ssh_cache_profile_for_host <host>
-# ---------------------------------------------------------------------------
-_ssh_cache_profile_for_host() {
-    local host="${1}"
-    _ssh_cache_init
-    awk -F: -v h="${host}" '$1==h {print $2, $3}' "${_SSH_CACHE_FILE}" \
-        | sort -k2 -rn \
-        | awk 'NR==1 {print $1}'
 }
 
 # ---------------------------------------------------------------------------
@@ -182,10 +177,8 @@ _ssh_cache_prune() {
     _ssh_cache_init
     (( _SSH_CACHE_TTL_DAYS == 0 )) && return 0
 
-    local now ttl_secs cutoff
-    now="$(_ssh_epoch)"
-    ttl_secs=$(( _SSH_CACHE_TTL_DAYS * 86400 ))
-    cutoff=$(( now - ttl_secs ))
+    local cutoff
+    cutoff="$(_ssh_cache_cutoff)"
 
     local tmp
     tmp="$(mktemp)" || return 1
