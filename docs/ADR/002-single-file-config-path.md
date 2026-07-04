@@ -6,15 +6,18 @@ Accepted
 
 ## Context
 
-The init-commands feature needs a config location for platform/host command definitions. Options considered:
+The init-commands feature needs a config location for platform/host command
+definitions. Options considered:
 
-1. **Directory-based (`_SSH_REMOTE_CMDS_DIR`)** — one file per host/platform, scanned at runtime
+1. **Directory-based (`_SSH_REMOTE_CMDS_DIR`)** — one file per host/platform, scanned
+   at runtime
 2. **Inline in plugin defaults** — commands hardcoded in lib/init.zsh
 3. **Single YAML file** — all platforms and hosts in one file
 
 ## Decision
 
-Use a single YAML file, path defined by `_SSH_REMOTE_CMDS` env var (default `~/.config/zsh-ssh-ct/init-commands.yml`).
+Use a single YAML file, path defined by `_SSH_REMOTE_CMDS` env var (default
+`~/.config/zsh-ssh-ct/init-commands.yml`).
 
 Rationale:
 

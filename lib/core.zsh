@@ -11,10 +11,10 @@
 _ssh_ping() {
     local host="${1}"
     case "${_SSH_OS}" in
-        Darwin) ping -c1 -t2  -q "${host}" &>/dev/null 2>&1 ;;
-        Linux)  ping -c1 -W2  -q "${host}" &>/dev/null 2>&1 ;;
-        *)      ping -c1 -W2     "${host}" &>/dev/null 2>&1 \
-             || ping -c1 -t2     "${host}" &>/dev/null 2>&1 ;;
+        Darwin) ping -c1 -t2  -q "${host}" &>/dev/null ;;
+        Linux)  ping -c1 -W2  -q "${host}" &>/dev/null ;;
+        *)      ping -c1 -W2     "${host}" &>/dev/null \
+             || ping -c1 -t2     "${host}" &>/dev/null ;;
     esac
 }
 
@@ -37,6 +37,42 @@ _ssh_resolves() {
         nc -z -w1 "${host}" 22 &>/dev/null && return 0
     fi
     return 1
+}
+
+# ---------------------------------------------------------------------------
+# Read known_hosts — prints one hostname per line to stdout.
+# Skips hashed entries, splits comma-separated groups, strips port/IPv6 zone.
+# ---------------------------------------------------------------------------
+_ssh_read_known_hosts() {
+    local kh="${1:-${HOME}/.ssh/known_hosts}"
+    [[ -r "${kh}" ]] || return 1
+    while IFS= read -r line; do
+        [[ "${line}" == \|* ]] && continue
+        local hf="${line%% *}"
+        local -a hf_parts=( ${(s:,:)hf} )
+        for hf in "${hf_parts[@]}"; do
+            hf="${hf#\[}"; hf="${hf%%\]*}"; hf="${hf%%:*}"
+            [[ -n "${hf}" ]] && print -- "${hf}"
+        done
+    done < "${kh}"
+}
+
+# ---------------------------------------------------------------------------
+# Read ~/.ssh/config Host entries — prints hostnames to stdout.
+# Skips wildcard patterns (*, ?).
+# ---------------------------------------------------------------------------
+_ssh_read_ssh_config_hosts() {
+    local cfg="${1:-${HOME}/.ssh/config}"
+    [[ -r "${cfg}" ]] || return 1
+    while IFS= read -r line; do
+        if [[ "${line}" =~ ^[[:space:]]*[Hh]ost[[:space:]] ]]; then
+            local hval="${line#*[Hh]ost }"
+            for h in ${=hval}; do
+                [[ "${h}" == *\** || "${h}" == *\?* ]] && continue
+                print -- "${h}"
+            done
+        fi
+    done < "${cfg}"
 }
 
 # ---------------------------------------------------------------------------
@@ -72,31 +108,14 @@ _ssh_fuzzy_match() {
     fi
 
     # ~/.ssh/known_hosts (skip hashed entries)
-    if [[ -r "${HOME}/.ssh/known_hosts" ]]; then
-        while IFS= read -r line; do
-            [[ "${line}" == \|* ]] && continue
-            local hf="${line%% *}"
-            # known_hosts allows comma-separated name,ip pairs — split them
-            local -a hf_parts=( ${(s:,:)hf} )
-            for hf in "${hf_parts[@]}"; do
-                hf="${hf#\[}"; hf="${hf%%\]*}"; hf="${hf%%:*}"
-                [[ -n "${hf}" ]] && candidates+=("${hf}")
-            done
-        done < "${HOME}/.ssh/known_hosts"
-    fi
+    while IFS= read -r h; do
+        candidates+=("${h}")
+    done < <(_ssh_read_known_hosts)
 
     # ~/.ssh/config Host entries (skip wildcards)
-    if [[ -r "${HOME}/.ssh/config" ]]; then
-        while IFS= read -r line; do
-            if [[ "${line}" =~ ^[[:space:]]*[Hh]ost[[:space:]] ]]; then
-                local hval="${line#*[Hh]ost }"
-                for h in ${=hval}; do
-                    [[ "${h}" == *\** || "${h}" == *\?* ]] && continue
-                    candidates+=("${h}")
-                done
-            fi
-        done < "${HOME}/.ssh/config"
-    fi
+    while IFS= read -r h; do
+        candidates+=("${h}")
+    done < <(_ssh_read_ssh_config_hosts)
 
     # Host cache
     while IFS= read -r cached; do
@@ -187,12 +206,14 @@ Cache management:
   _ssh_cache_delete <host> <prof>  Remove a specific host:profile pair
 
 Configuration (set in .zshrc before loading):
-  _SSH_CT_CONFIG_DIR   Config dir     (current: ${_SSH_CT_CONFIG_DIR})
-  _SSH_CACHE_FILE      Cache path     (current: ${_SSH_CACHE_FILE})
-  _SSH_MAX_RETRIES     Max retries    (current: ${_SSH_MAX_RETRIES})
-  _SSH_RETRY_SLEEP     Retry delay    (current: ${_SSH_RETRY_SLEEP}s)
-  _SSH_CACHE_TTL_DAYS  Cache TTL      (current: ${_SSH_CACHE_TTL_DAYS}d, 0=forever)
-  _SSH_FUZZY_CONFIRM   Confirm fuzzy  (current: ${_SSH_FUZZY_CONFIRM})
+  _SSH_CT_CONFIG_DIR          Config dir         (current: ${_SSH_CT_CONFIG_DIR})
+  _SSH_CACHE_FILE             Cache path         (current: ${_SSH_CACHE_FILE})
+  _SSH_MAX_RETRIES            Max retries        (current: ${_SSH_MAX_RETRIES})
+  _SSH_RETRY_SLEEP            Retry delay        (current: ${_SSH_RETRY_SLEEP}s)
+  _SSH_CACHE_TTL_DAYS         Cache TTL          (current: ${_SSH_CACHE_TTL_DAYS}d, 0=forever)
+  _SSH_FUZZY_CONFIRM          Confirm fuzzy      (current: ${_SSH_FUZZY_CONFIRM})
+  _SSH_REMOTE_CMDS            Init-cmds YAML     (current: ${_SSH_REMOTE_CMDS})
+  _SSH_INIT_CMD_SKIP_PROFILES Init-cmd skip      (current: ${_SSH_INIT_CMD_SKIP_PROFILES})
 EOF
 }
 
@@ -377,15 +398,15 @@ _ssh() {
     # Print the initial status line without a newline
     printf '%s%s' "${clreol}" "${status_prefix}"
 
+    # ── DNS check — skip for IPs, fatal for hostnames ──────────────────────
+    if [[ -z "${exact_host}" ]] && ! _ssh_resolves "${resolved_host}"; then
+        printf '\n'
+        echo "[_ssh] Error: '${resolved_host}' does not resolve. Check the hostname or DNS." >&2
+        return 1
+    fi
+
     while (( attempt < max_retries )); do
         (( attempt++ ))
-
-        # ── DNS check — skip for IPs, fatal for hostnames ──────────────────
-        if [[ -z "${exact_host}" ]] && ! _ssh_resolves "${resolved_host}"; then
-            printf '\n'
-            echo "[_ssh] Error: '${resolved_host}' does not resolve. Check the hostname or DNS." >&2
-            return 1
-        fi
 
         # ── Ping ───────────────────────────────────────────────────────────
         if _ssh_ping "${resolved_host}"; then
@@ -400,15 +421,8 @@ _ssh() {
                 "${ct_available}" "${remote_cmd[@]}"
             init_exit=$?
 
-            # If init_execute returned 0 with non-empty commands, it handled
-            # the session via zpty — use its exit code.
-            # If 0 with empty commands (skip), fall through to normal SSH.
             if (( init_exit == 0 )) && _ssh_init_did_run; then
-                local -i exit_code="${init_exit}"
-                if (( exit_code == 255 )); then
-                    echo "[_ssh] SSH connection failed (exit 255)." >&2
-                fi
-                return "${exit_code}"
+                return "${init_exit}"
             fi
 
             if (( ${#ct_cmd[@]} > 0 )); then

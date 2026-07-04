@@ -11,64 +11,66 @@ or other init boilerplate.
 2. Commands are sent via zsh/zpty (zero external dependencies)
 3. Layer precedence: **host > platform > defaults**
 4. Platform commands go first, host commands append (deduped first-match-wins)
-5. Variable expansion (`${COLUMNS}`, `$(uname)`, arithmetic) is supported via `${(e)}`
+5. Variable expansion (`${COLUMNS}`, `$(uname)`, arithmetic) is supported via
+   `${(e)}`
 6. Silent skip when: no config file, no match, or `commands: ["none"]`
 
 ## Config file
 
-Default path: `~/.config/zsh-ssh-ct/init-commands.yml` (override via `_SSH_REMOTE_CMDS`)
+Default path: `~/.config/zsh-ssh-ct/init-commands.yml` (override via
+`_SSH_REMOTE_CMDS`)
 
 ```yaml
 defaults:
   timeout: 5
-  prompt: '[>#$]'
+  prompt: "[>#$]"
   commands: []
 
 platforms:
   juniper:
-    prompt: '> $'
+    prompt: "> $"
     timeout: 10
     commands:
       - "set cli screen-length 0"
       - "set cli timestamp"
   cisco:
-    prompt: '[#>]'
+    prompt: "[#>]"
     commands:
       - "term length 0"
       - "term width 0"
   panos:
-    prompt: '[>#$]'
+    prompt: "[>#$]"
     commands:
       - "set cli pager off"
       - "set session timeout 0"
   unix:
-    prompt: '[#$]'
+    prompt: "[#$]"
 
 hosts:
   core-router:
     platform: juniper
-    prompt: 'custom>$'
+    prompt: "custom>$"
     timeout: 15
     commands:
       - "show configuration | display set"
   backup-router:
     platform: juniper
-    commands: ["none"]            # explicit opt-out
+    commands: ["none"] # explicit opt-out
   legacy-switch:
-    platform: cisco               # inherits all platform commands
+    platform: cisco # inherits all platform commands
 ```
 
-The `configs/init-commands.yml` file in this repo is a starter template — copy it
-to `~/.config/zsh-ssh-ct/init-commands.yml` and customize.
+The `configs/init-commands.yml` file in this repo is a starter template — copy it to
+`~/.config/zsh-ssh-ct/init-commands.yml` and customize.
 
 ## Schema
 
-|Field|Level|Type|Description|
-|-----|-----|----|-----------|
-|`timeout`|defaults / platform / host|integer|Seconds to wait for prompt before timeout (default: 5)|
-|`prompt`|defaults / platform / host|string|Regex pattern to detect prompt (default: `[>#$]`)|
-|`commands`|defaults / platform / host|list of strings|Commands to send after prompt match|
-|`platform`|host|string|Platform name to inherit commands from (juniper, cisco, panos, unix)|
+| Field      | Level                      | Type            | Description                                                          |
+| ---------- | -------------------------- | --------------- | -------------------------------------------------------------------- |
+| `timeout`  | defaults / platform / host | integer         | Seconds to wait for prompt before timeout (default: 5)               |
+| `prompt`   | defaults / platform / host | string          | Regex pattern to detect prompt (default: `[>#$]`)                    |
+| `commands` | defaults / platform / host | list of strings | Commands to send after prompt match                                  |
+| `platform` | host                       | string          | Platform name to inherit commands from (juniper, cisco, panos, unix) |
 
 Cascade precedence: **host > platform > defaults**. A value set at any level
 overrides the level below.

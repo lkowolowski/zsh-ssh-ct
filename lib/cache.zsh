@@ -160,18 +160,6 @@ _ssh_cache_hosts_annotated() {
 }
 
 # ---------------------------------------------------------------------------
-# Get the most recently used profile flag for a given host.
-# Usage: _ssh_cache_profile_for_host <host>
-# ---------------------------------------------------------------------------
-_ssh_cache_profile_for_host() {
-    local host="${1}"
-    _ssh_cache_init
-    awk -F: -v h="${host}" '$1==h {print $2, $3}' "${_SSH_CACHE_FILE}" \
-        | sort -k2 -rn \
-        | awk 'NR==1 {print $1}'
-}
-
-# ---------------------------------------------------------------------------
 # Remove stale entries from the cache file in-place.
 # Usage: _ssh_cache_prune [--quiet]
 # ---------------------------------------------------------------------------

@@ -24,16 +24,9 @@ _ssh_complete_known_hosts() {
     # Rebuild cache only when file has changed
     if [[ "${mtime}" != "${_SSH_KNOWN_HOSTS_MTIME}" ]]; then
         _SSH_KNOWN_HOSTS_CACHE=()
-        while IFS= read -r line; do
-            [[ "${line}" == \|* ]] && continue     # skip hashed entries
-            local hf="${line%% *}"
-            # known_hosts allows comma-separated name,ip pairs — split them
-            local -a hf_parts=( ${(s:,:)hf} )
-            for hf in "${hf_parts[@]}"; do
-                hf="${hf#\[}"; hf="${hf%%\]*}"; hf="${hf%%:*}"
-                [[ -n "${hf}" ]] && _SSH_KNOWN_HOSTS_CACHE+=("${hf}")
-            done
-        done < "${kh}"
+        while IFS= read -r h; do
+            _SSH_KNOWN_HOSTS_CACHE+=("${h}")
+        done < <(_ssh_read_known_hosts "${kh}")
         _SSH_KNOWN_HOSTS_MTIME="${mtime}"
     fi
 }
@@ -122,18 +115,10 @@ _ssh_complete() {
         done < <(_ssh_cache_hosts_annotated)
 
         # 3. ~/.ssh/config
-        if [[ -r "${HOME}/.ssh/config" ]]; then
-            while IFS= read -r line; do
-                if [[ "${line}" =~ ^[[:space:]]*[Hh]ost[[:space:]] ]]; then
-                    local hval="${line#*[Hh]ost }"
-                    for h in ${=hval}; do
-                        [[ "${h}" == *\** || "${h}" == *\?* ]] && continue
-                        [[ -n "${seen_hosts[$h]}" ]] && continue
-                        seen_hosts[$h]=1; all_hosts+=("${h}"); all_descs+=("(ssh/config)")
-                    done
-                fi
-            done < "${HOME}/.ssh/config"
-        fi
+        while IFS= read -r h; do
+            [[ -n "${seen_hosts[$h]}" ]] && continue
+            seen_hosts[$h]=1; all_hosts+=("${h}"); all_descs+=("(ssh/config)")
+        done < <(_ssh_read_ssh_config_hosts)
 
         # 4. ~/.ssh/known_hosts (mtime-cached)
         _ssh_complete_known_hosts

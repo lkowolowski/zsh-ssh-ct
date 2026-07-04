@@ -6,7 +6,8 @@ Accepted
 
 ## Context
 
-The init-commands feature needs to send commands to a remote SSH session and wait for prompt responses before handing control to the user. Several approaches exist:
+The init-commands feature needs to send commands to a remote SSH session and wait for
+prompt responses before handing control to the user. Several approaches exist:
 
 1. **expect** — requires external install, not always available on macOS/Linux
 2. **empty** (expect-like for ssh) — external dep, niche

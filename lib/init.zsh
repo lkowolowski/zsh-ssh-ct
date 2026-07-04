@@ -288,7 +288,6 @@ _ssh_init_resolve() {
 _ssh_init_zpty_bridge() {
     local old_tty
     local char="" line=""
-    local -i rc=0
 
     # Save and set raw terminal
     old_tty="$(stty -g 2>/dev/null)"
@@ -327,7 +326,7 @@ _ssh_init_zpty_bridge() {
     # Restore terminal
     _ssh_bridge_cleanup
 
-    return "${rc}"
+    return 0
 }
 
 # ---------------------------------------------------------------------------
