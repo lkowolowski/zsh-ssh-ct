@@ -218,6 +218,38 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# _ssh_build_ssh_cmd  — assemble ct + ssh command arrays
+#
+# Shared by _ssh() (core.zsh) and _ssh_init_execute() (init.zsh) so the
+# ct-availability / ct-config branching lives in exactly one place.
+#
+# Args: <ct_available> <ct_config> <verbose_flag> <ssh_target> [remote_cmd...]
+# Sets globals: _SSH_BUILT_CT_CMD, _SSH_BUILT_SSH_CMD
+# ---------------------------------------------------------------------------
+_ssh_build_ssh_cmd() {
+    local -i ct_available="${1}"
+    local ct_config="${2}" verbose_flag="${3}" ssh_target="${4}"
+    shift 4
+    local -a remote_cmd=( "${@}" )
+
+    local -a ssh_extra_flags
+    [[ -n "${verbose_flag}" ]] && ssh_extra_flags+=( "${verbose_flag}" )
+
+    typeset -ga _SSH_BUILT_CT_CMD=()
+    if (( ct_available )) && [[ -n "${ct_config}" ]]; then
+        _SSH_BUILT_CT_CMD=( ct -c "${ct_config}" )
+    elif (( ct_available )); then
+        _SSH_BUILT_CT_CMD=( ct )
+    fi
+
+    if (( ${#remote_cmd[@]} > 0 )); then
+        typeset -ga _SSH_BUILT_SSH_CMD=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" "${remote_cmd[@]}" )
+    else
+        typeset -ga _SSH_BUILT_SSH_CMD=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" )
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Core _ssh function
 # ---------------------------------------------------------------------------
 _ssh() {
@@ -357,23 +389,10 @@ _ssh() {
     fi
 
     # ── Build command arrays ──────────────────────────────────────────────────
-    local -a ct_cmd ssh_extra_flags ssh_cmd
-
-    if (( ct_available )) && [[ -n "${ct_config}" ]]; then
-        ct_cmd=( ct -c "${ct_config}" )
-    elif (( ct_available )); then
-        ct_cmd=( ct )
-    else
-        ct_cmd=()
-    fi
-
-    [[ -n "${verbose_flag}" ]] && ssh_extra_flags+=( "${verbose_flag}" )
-
-    if (( ${#remote_cmd[@]} > 0 )); then
-        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" "${remote_cmd[@]}" )
-    else
-        ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" )
-    fi
+    _ssh_build_ssh_cmd "${ct_available}" "${ct_config}" "${verbose_flag}" \
+        "${ssh_target}" "${remote_cmd[@]}"
+    local -a ct_cmd=( "${_SSH_BUILT_CT_CMD[@]}" )
+    local -a ssh_cmd=( "${_SSH_BUILT_SSH_CMD[@]}" )
 
     # ── Dry run ───────────────────────────────────────────────────────────────
     if (( dry_run )); then

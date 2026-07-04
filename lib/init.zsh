@@ -57,25 +57,27 @@ _ssh_init_eligible() {
 # All output up to (and including) the matching line is printed to stdout.
 # ---------------------------------------------------------------------------
 _ssh_init_zpty_wait() {
+    setopt localoptions extendedglob
+
     local timeout="${1}" prompt_regex="${2}"
-    local line="" output="" output_clean=""
+    local line="" output_clean=""
     local -i rc=1
 
     while (( timeout > 0 )); do
         if zpty -r -t _ssh_ct line 2>/dev/null; then
             print -n -- "${line}"
-            output+="${line}"
 
             local clean="${line//$'\r'/}"
-            setopt localoptions extendedglob
             clean="${clean//$'\x1b'\[[0-9;?]##[[:alpha:]]/}"
             clean="${clean//$'\x1b'\[[0-9;?]##~/}"
             clean="${clean//$'\x1b[?2004h'/}"
             clean="${clean//$'\x1b[?2004l'/}"
             output_clean+="${clean}"
 
-            # Check if either the current chunk or accumulated clean output matches
-            if [[ "${clean}" =~ ${prompt_regex} ]] || [[ "${output_clean}" =~ ${prompt_regex} ]]; then
+            # output_clean accumulates every chunk seen so far, so matching
+            # against it alone covers both same-chunk and split-across-reads
+            # prompt occurrences.
+            if [[ "${output_clean}" =~ ${prompt_regex} ]]; then
                 rc=0
                 break
             fi
@@ -125,6 +127,37 @@ _ssh_init_strip_comment() {
     done
 
     print -r -- "${out}"
+}
+
+# ---------------------------------------------------------------------------
+# _ssh_init_ltrim / _ssh_init_rtrim  — whitespace trim helpers
+#
+# Used throughout _ssh_init_resolve's line-by-line YAML parsing. Named
+# helpers instead of repeating the glob idiom inline at every call site.
+# ---------------------------------------------------------------------------
+_ssh_init_ltrim() {
+    local s="${1}"
+    print -r -- "${s#"${s%%[^ ]*}"}"
+}
+
+_ssh_init_rtrim() {
+    local s="${1}"
+    print -r -- "${s%"${s##*[^ ]}"}"
+}
+
+# ---------------------------------------------------------------------------
+# _ssh_init_unquote  — strip wrapping single or double quotes from a
+# YAML scalar value (e.g. "command" or 'command' → command). Leaves the
+# value unchanged if it isn't wrapped in a matching pair of quotes.
+# ---------------------------------------------------------------------------
+_ssh_init_unquote() {
+    local s="${1}"
+    if [[ "${s}" == \"*\" && "${s}" == *\" ]]; then
+        s="${s#\"}"; s="${s%\"}"
+    elif [[ "${s}" == "'"* && "${s}" == *"'" ]]; then
+        s="${s#\'}"; s="${s%\'}"
+    fi
+    print -r -- "${s}"
 }
 
 # ---------------------------------------------------------------------------
@@ -186,7 +219,7 @@ _ssh_init_resolve() {
         # causes zsh to print "var=value" as a side effect.
         local stripped=""
         stripped="$(_ssh_init_strip_comment "${line}")"
-        stripped="${stripped%"${stripped##*[^ ]}"}"  # rtrim
+        stripped="$(_ssh_init_rtrim "${stripped}")"
 
         [[ -z "${stripped}" ]] && continue
 
@@ -203,15 +236,8 @@ _ssh_init_resolve() {
         if (( in_commands )) && [[ "${payload}" == -* ]]; then
             local cmd_val="${payload#- }"
             [[ "${cmd_val}" == "${payload}" ]] && cmd_val="${payload#-}"
-            cmd_val="${cmd_val%"${cmd_val##*[^ ]}"}"
-            # Strip wrapping quotes from YAML scalars like "command"
-            if [[ "${cmd_val}" == \"*\" && "${cmd_val}" == *\" ]]; then
-                cmd_val="${cmd_val#\"}"
-                cmd_val="${cmd_val%\"}"
-            elif [[ "${cmd_val}" == "'"* && "${cmd_val}" == *"'" ]]; then
-                cmd_val="${cmd_val#\'}"
-                cmd_val="${cmd_val%\'}"
-            fi
+            cmd_val="$(_ssh_init_rtrim "${cmd_val}")"
+            cmd_val="$(_ssh_init_unquote "${cmd_val}")"
             if [[ -n "${active_host}" ]]; then
                 if [[ -n "${host_cmd_map[$active_host]}" ]]; then
                     host_cmd_map[$active_host]+="${cmd_sep}${cmd_val}"
@@ -243,15 +269,11 @@ _ssh_init_resolve() {
         # ── defaults section: fields live directly at depth 1 (no name level) ──
         if [[ "${stack[1]}" == "defaults" ]] && (( depth == 1 )); then
             local def_key="${payload%%:*}"
-            def_key="${def_key%"${def_key##*[^ ]}"}"
+            def_key="$(_ssh_init_rtrim "${def_key}")"
             local def_val="${payload#*:}"
-            def_val="${def_val#"${def_val%%[^ ]*}"}"
-            def_val="${def_val%"${def_val##*[^ ]}"}"
-            if [[ "${def_val}" == \"* && "${def_val}" == *\" ]]; then
-                def_val="${def_val#\"}"; def_val="${def_val%\"}"
-            elif [[ "${def_val}" == "'"* && "${def_val}" == *"'" ]]; then
-                def_val="${def_val#\'}"; def_val="${def_val%\'}"
-            fi
+            def_val="$(_ssh_init_ltrim "${def_val}")"
+            def_val="$(_ssh_init_rtrim "${def_val}")"
+            def_val="$(_ssh_init_unquote "${def_val}")"
 
             if [[ "${def_key}" == "commands" ]]; then
                 in_commands=1
@@ -282,17 +304,11 @@ _ssh_init_resolve() {
         if (( depth == 2 )); then
             # Key: value pair
             local key="${payload%%:*}"
-            key="${key%"${key##*[^ ]}"}"
+            key="$(_ssh_init_rtrim "${key}")"
             local val="${payload#*:}"
-            val="${val#"${val%%[^ ]*}"}"
-            val="${val%"${val##*[^ ]}"}"
-            if [[ "${val}" == \"* && "${val}" == *\" ]]; then
-                val="${val#\"}"
-                val="${val%\"}"
-            elif [[ "${val}" == "'"* && "${val}" == *"'" ]]; then
-                val="${val#\'}"
-                val="${val%\'}"
-            fi
+            val="$(_ssh_init_ltrim "${val}")"
+            val="$(_ssh_init_rtrim "${val}")"
+            val="$(_ssh_init_unquote "${val}")"
 
             if [[ "${key}" == "commands" ]]; then
                 in_commands=1
@@ -492,20 +508,11 @@ _ssh_init_execute() {
     zmodload zsh/zpty 2>/dev/null || return 0
 
     # ── Build command ─────────────────────────────────────────────
-    local -a ssh_cmd ssh_extra_flags
-    local -a ct_cmd
-
-    [[ -n "${verbose_flag}" ]] && ssh_extra_flags+=( "${verbose_flag}" )
-
-    if (( ct_available )) && [[ -n "${ct_config}" ]]; then
-        ct_cmd=( ct -c "${ct_config}" )
-    elif (( ct_available )); then
-        ct_cmd=( ct )
-    else
-        ct_cmd=()
-    fi
-
-    ssh_cmd=( ssh "${ssh_extra_flags[@]}" "${ssh_target}" )
+    # remote_cmd is intentionally omitted here — init-commands only run
+    # when _ssh_init_eligible confirmed no remote command was passed.
+    _ssh_build_ssh_cmd "${ct_available}" "${ct_config}" "${verbose_flag}" "${ssh_target}"
+    local -a ct_cmd=( "${_SSH_BUILT_CT_CMD[@]}" )
+    local -a ssh_cmd=( "${_SSH_BUILT_SSH_CMD[@]}" )
 
     # ── Start zpty ────────────────────────────────────────────────
     if (( ${#ct_cmd[@]} > 0 )); then
