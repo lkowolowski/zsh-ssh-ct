@@ -411,7 +411,7 @@ _ssh() {
         # ── Ping ───────────────────────────────────────────────────────────
         if _ssh_ping "${resolved_host}"; then
             printf '\r%s\n' "${clreol}"
-            printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  config: ${ct_config_display}\n"
+            printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}\n"
             _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
             # Try init-commands first (replaces normal SSH if commands found)

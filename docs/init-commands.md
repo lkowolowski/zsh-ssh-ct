@@ -28,7 +28,7 @@ defaults:
 
 platforms:
   juniper:
-    prompt: "> $"
+    prompt: "([>%]|\\]#)[[:space:]]*$"
     timeout: 10
     commands:
       - "set cli screen-length 0"

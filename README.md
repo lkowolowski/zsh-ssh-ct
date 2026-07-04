@@ -54,6 +54,19 @@ brew install uv
 uv tool install chromaterm
 ```
 
+### Quick setup
+
+If you have [mise](https://mise.jdx.dev) installed, run this from the repo root
+to copy profiles and create a commented init-commands template:
+
+```sh
+mise run install
+```
+
+This copies the bundled ct highlight YAMLs into `~/.config/chromaterm/` and
+creates `~/.config/zsh-ssh-ct/init-commands.yml` (all lines commented).
+Edit that file to enable init-commands for your devices.
+
 ---
 
 ## Installation

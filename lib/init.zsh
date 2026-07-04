@@ -58,15 +58,24 @@ _ssh_init_eligible() {
 # ---------------------------------------------------------------------------
 _ssh_init_zpty_wait() {
     local timeout="${1}" prompt_regex="${2}"
-    local line="" output=""
+    local line="" output="" output_clean=""
     local -i rc=1
 
     while (( timeout > 0 )); do
         if zpty -r -t _ssh_ct line 2>/dev/null; then
             print -n -- "${line}"
             output+="${line}"
-            # Check if the last chunk matches the prompt
-            if [[ "${output}" =~ ${prompt_regex} ]]; then
+
+            local clean="${line//$'\r'/}"
+            setopt localoptions extendedglob
+            clean="${clean//$'\x1b'\[[0-9;?]##[[:alpha:]]/}"
+            clean="${clean//$'\x1b'\[[0-9;?]##~/}"
+            clean="${clean//$'\x1b[?2004h'/}"
+            clean="${clean//$'\x1b[?2004l'/}"
+            output_clean+="${clean}"
+
+            # Check if either the current chunk or accumulated clean output matches
+            if [[ "${clean}" =~ ${prompt_regex} ]] || [[ "${output_clean}" =~ ${prompt_regex} ]]; then
                 rc=0
                 break
             fi
@@ -81,6 +90,41 @@ _ssh_init_zpty_wait() {
     done
 
     return "${rc}"
+}
+
+# ---------------------------------------------------------------------------
+# _ssh_init_strip_comment  — quote-aware '#' comment stripper
+#
+# A naive "${line%%#*}" truncates at the first '#' anywhere on the line,
+# including one embedded inside a quoted scalar (e.g. a regex value like
+# "\]#)"). YAML only treats '#' as a comment start when it is outside any
+# quoted string, so we scan char-by-char tracking quote state.
+# ---------------------------------------------------------------------------
+_ssh_init_strip_comment() {
+    local s="${1}"
+    local -i i=0 len=${#s} in_squote=0 in_dquote=0
+    local out="" c
+
+    while (( i < len )); do
+        c="${s[i+1]}"
+        if (( in_squote )); then
+            out+="${c}"
+            [[ "${c}" == "'" ]] && in_squote=0
+        elif (( in_dquote )); then
+            out+="${c}"
+            [[ "${c}" == '"' ]] && in_dquote=0
+        else
+            case "${c}" in
+                "'") in_squote=1; out+="${c}" ;;
+                '"') in_dquote=1; out+="${c}" ;;
+                '#') break ;;
+                *) out+="${c}" ;;
+            esac
+        fi
+        (( i++ ))
+    done
+
+    print -r -- "${out}"
 }
 
 # ---------------------------------------------------------------------------
@@ -111,34 +155,79 @@ _ssh_init_resolve() {
     #   hosts: { <name>: { platform, prompt, timeout, commands } }
     #
     # Approach: read line-by-line, track indentation depth with a stack.
+    #
+    # NOTE: noextendedglob prevents # from being treated as a glob quantifier
+    #       in patterns like ${line%%\#*}. Using [^ ] instead of [! ] for
+    #       bracket negation since [^ ] works without EXTENDED_GLOB.
+
+    setopt localoptions noextendedglob
 
     local -a stack=()
     local -i in_commands=0
-    local -a platform_cmds=() host_cmds=() default_cmds=()
+    local -a default_cmds=()
     local active_platform="" active_host=""
-    local host_platform_val=""
+    # Commands per platform/host are accumulated as newline-joined blobs and
+    # split back out with the (@f) flag — the (@s:$var:) split flag does NOT
+    # reliably parameter-expand a dynamic delimiter in zsh, so a literal
+    # newline (always safe — command strings can't contain one) is used.
+    local cmd_sep=$'\n'
+    typeset -A platform_cmd_map
+    typeset -A host_cmd_map
 
     # Associative accumulators
     typeset -gA _ssh_init_data
     _ssh_init_data=()
 
     while IFS= read -r line; do
-        # Strip full-line and trailing comments (naive — not inside strings)
-        local stripped="${line%%#*}"
-        stripped="${stripped%"${stripped##*[! ]}"}"  # rtrim
+        # Strip comments — quote-aware so a '#' inside a quoted scalar
+        # (e.g. a prompt regex like "\]#)") is not mistaken for a comment.
+        # NOTE: must assign on the same line as `local` — a bare `local var`
+        # re-declaration on an already-local var (2nd+ loop iteration)
+        # causes zsh to print "var=value" as a side effect.
+        local stripped=""
+        stripped="$(_ssh_init_strip_comment "${line}")"
+        stripped="${stripped%"${stripped##*[^ ]}"}"  # rtrim
 
         [[ -z "${stripped}" ]] && continue
 
         # Measure leading spaces
-        local indent="${stripped//[^ ]/}"
+        local indent="${stripped%%[^ ]*}"
         local -i depth=$(( ${#indent} / 2 ))  # assuming 2-space indent
-
-        local payload="${stripped## #}"
-        local payload="${payload#"${payload%%[! ]*}"}"  # ltrim
+        local payload="${stripped#${indent}}"
 
         # Terminate command list on dedent or new section
         if (( depth <= 1 )) && (( in_commands )); then
             in_commands=0
+        fi
+
+        if (( in_commands )) && [[ "${payload}" == -* ]]; then
+            local cmd_val="${payload#- }"
+            [[ "${cmd_val}" == "${payload}" ]] && cmd_val="${payload#-}"
+            cmd_val="${cmd_val%"${cmd_val##*[^ ]}"}"
+            # Strip wrapping quotes from YAML scalars like "command"
+            if [[ "${cmd_val}" == \"*\" && "${cmd_val}" == *\" ]]; then
+                cmd_val="${cmd_val#\"}"
+                cmd_val="${cmd_val%\"}"
+            elif [[ "${cmd_val}" == "'"* && "${cmd_val}" == *"'" ]]; then
+                cmd_val="${cmd_val#\'}"
+                cmd_val="${cmd_val%\'}"
+            fi
+            if [[ -n "${active_host}" ]]; then
+                if [[ -n "${host_cmd_map[$active_host]}" ]]; then
+                    host_cmd_map[$active_host]+="${cmd_sep}${cmd_val}"
+                else
+                    host_cmd_map[$active_host]="${cmd_val}"
+                fi
+            elif [[ -n "${active_platform}" ]]; then
+                if [[ -n "${platform_cmd_map[$active_platform]}" ]]; then
+                    platform_cmd_map[$active_platform]+="${cmd_sep}${cmd_val}"
+                else
+                    platform_cmd_map[$active_platform]="${cmd_val}"
+                fi
+            else
+                default_cmds+=( "${cmd_val}" )
+            fi
+            continue
         fi
 
         # Top-level sections
@@ -147,6 +236,31 @@ _ssh_init_resolve() {
                 "defaults:")  stack=( "defaults" ); active_platform=""; active_host=""; continue ;;
                 "platforms:") stack=( "platforms" ); active_platform=""; active_host=""; continue ;;
                 "hosts:")     stack=( "hosts" );    active_platform=""; active_host=""; continue ;;
+            esac
+            continue
+        fi
+
+        # ── defaults section: fields live directly at depth 1 (no name level) ──
+        if [[ "${stack[1]}" == "defaults" ]] && (( depth == 1 )); then
+            local def_key="${payload%%:*}"
+            def_key="${def_key%"${def_key##*[^ ]}"}"
+            local def_val="${payload#*:}"
+            def_val="${def_val#"${def_val%%[^ ]*}"}"
+            def_val="${def_val%"${def_val##*[^ ]}"}"
+            if [[ "${def_val}" == \"* && "${def_val}" == *\" ]]; then
+                def_val="${def_val#\"}"; def_val="${def_val%\"}"
+            elif [[ "${def_val}" == "'"* && "${def_val}" == *"'" ]]; then
+                def_val="${def_val#\'}"; def_val="${def_val%\'}"
+            fi
+
+            if [[ "${def_key}" == "commands" ]]; then
+                in_commands=1
+                continue
+            fi
+
+            case "${def_key}" in
+                prompt)  _ssh_init_data[def_prompt]="${def_val}" ;;
+                timeout) _ssh_init_data[def_timeout]="${def_val}" ;;
             esac
             continue
         fi
@@ -166,24 +280,19 @@ _ssh_init_resolve() {
 
         # ── depth == 2: fields under platform/host, or list items ──
         if (( depth == 2 )); then
-            if [[ "${payload}" == -* ]]; then
-                # List item
-                local cmd_val="${payload#- }"
-                cmd_val="${cmd_val%"${cmd_val##*[! ]}"}"
-                if [[ -n "${active_host}" ]]; then
-                    host_cmds+=( "${cmd_val}" )
-                elif [[ -n "${active_platform}" ]]; then
-                    platform_cmds+=( "${cmd_val}" )
-                else
-                    default_cmds+=( "${cmd_val}" )
-                fi
-                continue
-            fi
-
             # Key: value pair
             local key="${payload%%:*}"
-            key="${key%"${key##*[! ]}"}"
-            local val="${payload#*: }"
+            key="${key%"${key##*[^ ]}"}"
+            local val="${payload#*:}"
+            val="${val#"${val%%[^ ]*}"}"
+            val="${val%"${val##*[^ ]}"}"
+            if [[ "${val}" == \"* && "${val}" == *\" ]]; then
+                val="${val#\"}"
+                val="${val%\"}"
+            elif [[ "${val}" == "'"* && "${val}" == *"'" ]]; then
+                val="${val#\'}"
+                val="${val%\'}"
+            fi
 
             if [[ "${key}" == "commands" ]]; then
                 in_commands=1
@@ -194,7 +303,7 @@ _ssh_init_resolve() {
                 case "${key}" in
                     prompt)   _ssh_init_data[host_${active_host}_prompt]="${val}" ;;
                     timeout)  _ssh_init_data[host_${active_host}_timeout]="${val}" ;;
-                    platform) host_platform_val="${val}" ;;
+                    platform) _ssh_init_data[host_${active_host}_platform]="${val}" ;;
                 esac
             elif [[ -n "${active_platform}" ]]; then
                 case "${key}" in
@@ -223,8 +332,9 @@ _ssh_init_resolve() {
     esac
 
     # Check if host has a explicit platform override
-    if [[ -n "${host_platform_val}" ]]; then
-        resolved_platform="${host_platform_val}"
+    local host_platform="${_ssh_init_data[host_${host}_platform]}"
+    if [[ -n "${host_platform}" ]]; then
+        resolved_platform="${host_platform}"
     fi
 
     # Cascade: defaults → platform → host
@@ -255,6 +365,18 @@ _ssh_init_resolve() {
     local -A seen_cmds=()
 
     local cmd
+    local -a platform_cmds=()
+    local platform_cmd_blob="${platform_cmd_map[$resolved_platform]}"
+    if [[ -n "${platform_cmd_blob}" ]]; then
+        platform_cmds=( "${(@f)platform_cmd_blob}" )
+    fi
+
+    local -a host_cmds=()
+    local host_cmd_blob="${host_cmd_map[$host]}"
+    if [[ -n "${host_cmd_blob}" ]]; then
+        host_cmds=( "${(@f)host_cmd_blob}" )
+    fi
+
     for cmd in "${default_cmds[@]}" "${platform_cmds[@]}"; do
         if [[ -z "${seen_cmds[$cmd]}" ]]; then
             seen_cmds[$cmd]=1
@@ -305,8 +427,12 @@ _ssh_init_zpty_bridge() {
         zpty -t _ssh_ct 2>/dev/null || break
 
         # Forward stdin → zpty (non-blocking single char)
+        # -n is critical: without it, zpty -w appends a trailing newline to
+        # EVERY forwarded keystroke, turning each character the user types
+        # into its own submitted line (e.g. "exit" becomes four separate
+        # one-character commands sent to the remote).
         if read -t 0 -k 1 char 2>/dev/null; then
-            zpty -w _ssh_ct "${char}"
+            zpty -w -n _ssh_ct "${char}"
         fi
 
         # Forward zpty → stdout (available data)
@@ -404,13 +530,16 @@ _ssh_init_execute() {
     # ── Send each command ─────────────────────────────────────────
     local cmd
     for cmd in "${commands[@]}"; do
-        # Echo with variable expansion
+        # Variable expansion — no local echo here: the remote pty echoes
+        # back what it receives (normal terminal behavior), and that echo
+        # is already printed by _ssh_init_zpty_wait below. Printing our own
+        # "> cmd" here would duplicate it.
         # shellcheck disable=SC2296
         local expanded="${(e)cmd}"
-        echo "> ${expanded}"
 
-        # Send command
-        zpty -w _ssh_ct "${expanded}"$'\n'
+        # Send command — pass -n so zpty doesn't append its OWN trailing
+        # newline on top of the one we're adding explicitly.
+        zpty -w -n _ssh_ct "${expanded}"$'\n'
 
         # Wait for prompt
         if ! _ssh_init_zpty_wait "${_SSH_INIT_TIMEOUT}" "${_SSH_INIT_PROMPT}"; then
