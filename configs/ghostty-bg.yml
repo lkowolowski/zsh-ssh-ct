@@ -1,0 +1,12 @@
+# Ghostty background color configuration for zsh-ssh-ct
+# Path defined by _SSH_GHOSTTY_BG_CONFIG env var
+# (default: ~/.config/zsh-ssh-ct/ghostty-bg.yml)
+#
+# Colors MUST be quoted (YAML treats bare # as comment).
+# null = no background change for that profile.
+# Uncomment and set colors for the profiles you want to highlight.
+
+# j: "#1A3A2A"   # Juniper
+# c: "#1A2A3A"   # Cisco
+# p: "#3A1A1A"   # PAN-OS
+# u: null         # Unix — no change
