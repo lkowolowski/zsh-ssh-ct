@@ -253,7 +253,11 @@ _ssh_build_ssh_cmd() {
 # ---------------------------------------------------------------------------
 # Core _ssh function
 # ---------------------------------------------------------------------------
+# shellcheck disable=SC1072,SC1073,SC1056,SC1141
 _ssh() {
+    # Wrap entire execution body so _ssh_ghostty_reset_bg runs on every exit
+    # path (normal return, error, SIGINT, etc.).
+    {
     # ── ct is optional — fall back to plain ssh if not installed ─────────────
     local ct_available=0
     command -v ct &>/dev/null && ct_available=1
@@ -404,6 +408,11 @@ _ssh() {
         return 0
     fi
 
+    # ── Set Ghostty background before SSH execution ─────────────────────────
+    # This runs after all validation passes. The always block at the end of
+    # the function restores the original background on any exit path.
+    _ssh_ghostty_set_bg "${profile_flag}"
+
     local profile_name="${_SSH_PROFILE_NAMES[$profile_flag]}"
     local red=$'\033[0;31m'
     local green=$'\033[0;32m'
@@ -486,4 +495,7 @@ _ssh() {
     done
 
     return 1
+    } always {
+        _ssh_ghostty_reset_bg
+    }
 }
