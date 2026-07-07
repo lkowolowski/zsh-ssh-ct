@@ -195,10 +195,10 @@ _ssh_init_resolve() {
 
     setopt localoptions noextendedglob
 
-    local -a stack=()
     local -i in_commands=0
     local -a default_cmds=()
     local active_platform="" active_host=""
+    local current_section=""
     # Commands per platform/host are accumulated as newline-joined blobs and
     # split back out with the (@f) flag — the (@s:$var:) split flag does NOT
     # reliably parameter-expand a dynamic delimiter in zsh, so a literal
@@ -208,7 +208,7 @@ _ssh_init_resolve() {
     typeset -A host_cmd_map
 
     # Associative accumulators
-    typeset -gA _ssh_init_data
+    typeset -A _ssh_init_data
     _ssh_init_data=()
 
     while IFS= read -r line; do
@@ -259,15 +259,16 @@ _ssh_init_resolve() {
         # Top-level sections
         if (( depth == 0 )); then
             case "${payload}" in
-                "defaults:")  stack=( "defaults" ); active_platform=""; active_host=""; continue ;;
-                "platforms:") stack=( "platforms" ); active_platform=""; active_host=""; continue ;;
-                "hosts:")     stack=( "hosts" );    active_platform=""; active_host=""; continue ;;
+                "defaults:")  current_section="defaults"; active_platform=""; active_host=""; continue ;;
+                "platforms:") current_section="platforms"; active_platform=""; active_host=""; continue ;;
+                "hosts:")     current_section="hosts";    active_platform=""; active_host=""; continue ;;
+                *)             current_section="" ;;
             esac
             continue
         fi
 
         # ── defaults section: fields live directly at depth 1 (no name level) ──
-        if [[ "${stack[1]}" == "defaults" ]] && (( depth == 1 )); then
+        if [[ "${current_section}" == "defaults" ]] && (( depth == 1 )); then
             local def_key="${payload%%:*}"
             def_key="$(_ssh_init_rtrim "${def_key}")"
             local def_val="${payload#*:}"
@@ -290,10 +291,10 @@ _ssh_init_resolve() {
         # ── depth == 1: platform name or host name ──
         if (( depth == 1 )); then
             in_commands=0
-            if [[ "${stack[1]}" == "platforms" ]]; then
+            if [[ "${current_section}" == "platforms" ]]; then
                 active_platform="${payload%%:*}"
                 active_host=""
-            elif [[ "${stack[1]}" == "hosts" ]]; then
+            elif [[ "${current_section}" == "hosts" ]]; then
                 active_host="${payload%%:*}"
                 active_platform=""
             fi

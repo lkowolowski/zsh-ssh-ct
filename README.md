@@ -16,13 +16,12 @@ and rich tab completion.
   background auto-prune
 - **Init-commands** — sends platform boilerplate after SSH connects via zsh/zpty
   ([docs](docs/init-commands.md))
-- **Tab completion** — profile-aware host names, remote command suggestions,
-  works before or after `compinit`
-- **Ghostty background colors** — changes terminal background per device type
-  ([docs](docs/ghostty-bg.md))
-- **ct is optional** — falls back to plain `ssh` with no highlighting
-- **ct highlight configs** — bundled YAMLs for all four device types
-  ([docs](docs/ct-highlight.md))
+- **Bundled ct highlight configs** — full ct-highlight YAMLs for all four device
+  types in `profiles/` ([docs](docs/ct-highlight.md))
+- **Ghostty background integration** — optional OSC 11 switching per profile with
+  automatic restore ([docs](docs/ghostty-bg.md))
+
+---
 
 ## Quick start
 
@@ -52,12 +51,12 @@ retry behavior, and tab completion details.
 
 ## Further reading
 
-- [Usage](docs/usage.md) — profiles, flags, fuzzy matching, completion
-- [Configuration](docs/configuration.md) — all environment variables
-- [Cache management](docs/cache.md) — show, prune, delete, TTL
-- [Init-commands](docs/init-commands.md) — auto-send platform commands
-- [ct highlight configs](docs/ct-highlight.md) — bundled YAML profiles
-- [Ghostty background colors](docs/ghostty-bg.md) — dynamic terminal bg
+- **Init-commands** — [docs/init-commands.md](docs/init-commands.md) — full schema,
+  layering, gating
+- **ct highlight configs** — [docs/ct-highlight.md](docs/ct-highlight.md) — setup,
+  profiles, customization
+- **Ghostty background integration** — [docs/ghostty-bg.md](docs/ghostty-bg.md) —
+  enablement, config layering, save/restore behavior
 
 ## File layout
 
