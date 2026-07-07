@@ -134,12 +134,16 @@ _ssh_cache_hosts() {
     local profile="${1:-}"
     _ssh_cache_init
 
-    local cutoff
-    cutoff="$(_ssh_cache_cutoff)"
+    local cutoff=""
+    local -i ttl_enabled=0
+    if (( _SSH_CACHE_TTL_DAYS > 0 )); then
+        ttl_enabled=1
+        cutoff="$(_ssh_cache_cutoff)"
+    fi
 
     while IFS=: read -r h p ts; do
         [[ -z "${h}" ]] && continue
-        (( _SSH_CACHE_TTL_DAYS > 0 && ts < cutoff )) && continue
+        (( ttl_enabled && ts < cutoff )) && continue
         [[ -n "${profile}" && "${p}" != "${profile}" ]] && continue
         print -- "${h}"
     done < "${_SSH_CACHE_FILE}"
@@ -154,12 +158,16 @@ _ssh_cache_hosts_annotated() {
     local profile="${1:-}"
     _ssh_cache_init
 
-    local cutoff
-    cutoff="$(_ssh_cache_cutoff)"
+    local cutoff=""
+    local -i ttl_enabled=0
+    if (( _SSH_CACHE_TTL_DAYS > 0 )); then
+        ttl_enabled=1
+        cutoff="$(_ssh_cache_cutoff)"
+    fi
 
     while IFS=: read -r h p ts; do
         [[ -z "${h}" ]] && continue
-        (( _SSH_CACHE_TTL_DAYS > 0 && ts < cutoff )) && continue
+        (( ttl_enabled && ts < cutoff )) && continue
         [[ -n "${profile}" && "${p}" != "${profile}" ]] && continue
         local label="${_SSH_PROFILE_NAMES[$p]:-unknown}"
         printf '%s\t(%s)\n' "${h}" "${label}"

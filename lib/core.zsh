@@ -133,12 +133,14 @@ _ssh_fuzzy_match() {
     local best_host="${query}"
     local -i best_score=2
 
-    local candidate lc_candidate lc_query
-    local -i score ci qi qlen clen
+    local lc_query="${query:l}"
+    local -i qlen=${#lc_query}
+
+    local candidate lc_candidate
+    local -i score ci qi clen
 
     for candidate in "${unique_candidates[@]}"; do
         lc_candidate="${candidate:l}"
-        lc_query="${query:l}"
         score=0
 
         [[ "${lc_candidate}" == *"${lc_query}"* ]] && (( score += 15 ))
@@ -146,7 +148,6 @@ _ssh_fuzzy_match() {
 
         # Sequential character scan
         ci=0; qi=0
-        qlen=${#lc_query}
         clen=${#lc_candidate}
         while (( qi < qlen && ci < clen )); do
             [[ "${lc_candidate[ci+1]}" == "${lc_query[qi+1]}" ]] && (( qi++ ))

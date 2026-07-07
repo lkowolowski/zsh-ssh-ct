@@ -42,6 +42,8 @@ caching with TTL, and rich tab completion.
   ([docs](docs/init-commands.md))
 - **Bundled ct highlight configs** — full ct-highlight YAMLs for all four device
   types in `profiles/` ([docs](docs/ct-highlight.md))
+- **Ghostty background integration** — optional OSC 11 switching per profile with
+  automatic restore ([docs](docs/ghostty-bg.md))
 
 ---
 
@@ -233,6 +235,8 @@ invoke `_ssh`. If it isn't found, you'll get a clear error with install instruct
   layering, gating
 - **ct highlight configs** — [docs/ct-highlight.md](docs/ct-highlight.md) — setup,
   profiles, customization
+- **Ghostty background integration** — [docs/ghostty-bg.md](docs/ghostty-bg.md) —
+  enablement, config layering, save/restore behavior
 
 ## File layout
 
