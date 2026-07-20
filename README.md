@@ -1,19 +1,15 @@
 # zsh-ssh-ct
 
 A zsh plugin that wraps SSH with [ChromaTerm
-(`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output, fuzzy
-host matching, automatic retry with status display, host/profile caching with TTL,
-and rich tab completion.
+(`ct`)](https://github.com/hSaria/ChromaTerm) for syntax-highlighted output,
+automatic retry with status display, and rich tab completion.
 
 ## Features
 
 - **Profile-based ct configs** — `-j` Juniper, `-c` Cisco, `-p` PAN-OS, `-u` Unix
 - **Ping retry loop** — waits up to `_SSH_MAX_RETRIES` × `_SSH_RETRY_SLEEP` with
   single-line status; replaces ✗ on success with ✓
-- **Fuzzy host matching** — scores candidates from cache, `~/.ssh/config`,
-  and `~/.ssh/known_hosts`
-- **Host/profile cache** — remembers connections with TTL; secure permissions;
-  background auto-prune
+
 - **Init-commands** — sends platform boilerplate after SSH connects via zsh/zpty
   ([docs](docs/init-commands.md))
 - **Bundled ct highlight configs** — full ct-highlight YAMLs for all four device
@@ -43,10 +39,9 @@ _ssh -j core-router                           # connect with Juniper profile
 _ssh -c switch "show interfaces status"       # passthrough remote command
 _ssh -p fw-01 -v                              # verbose SSH
 _ssh -u web-01 -n                             # dry run
-_ssh -j -H core-rtr-01                        # exact host, skip fuzzy
 ```
 
-See [docs/usage.md](docs/usage.md) for full usage, flags, fuzzy matching,
+See [docs/usage.md](docs/usage.md) for full usage, flags,
 retry behavior, and tab completion details.
 
 ## Further reading
@@ -61,10 +56,9 @@ retry behavior, and tab completion details.
 ## File layout
 
 ```text
-├── zsh-ssh-ct.plugin.zsh    ← loader: defaults, sources lib/, auto-prune
+├── zsh-ssh-ct.plugin.zsh    ← loader: defaults, sources lib/
 ├── lib/
-│   ├── cache.zsh            ← cache read/write/TTL/prune/display
-│   ├── core.zsh             ← _ssh(), fuzzy match, ping, retry, usage
+│   ├── core.zsh             ← _ssh(), ping, retry, usage
 │   ├── complete.zsh         ← tab completion, deferred compdef
 │   ├── init.zsh             ← init-commands via zsh/zpty
 │   └── ghostty.zsh          ← OSC 11 save/restore for Ghostty bg
@@ -75,7 +69,6 @@ retry behavior, and tab completion details.
 ├── docs/
 │   ├── usage.md             ← full usage reference
 │   ├── configuration.md     ← all config vars
-│   ├── cache.md             ← cache commands
 │   ├── init-commands.md     ← init-commands schema
 │   ├── ct-highlight.md      ← ct highlight reference
 │   ├── ghostty-bg.md        ← Ghostty bg color reference

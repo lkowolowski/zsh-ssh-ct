@@ -61,7 +61,7 @@ _ssh_complete() {
                 profile_flag_given="${w#-}"
                 used_flags+=("${w}")
                 ;;
-            -v|-n|-H|-f) used_flags+=("${w}") ;;
+            -v|-n|-f) used_flags+=("${w}") ;;
         esac
         # Capture host: first non-flag word after the profile flag
         if [[ -n "${profile_flag_given}" && -z "${host_given}" \
@@ -82,10 +82,9 @@ _ssh_complete() {
         -v '-v[Verbose SSH output]'
         -n '-n[Dry run — print command without executing]'
         -f '-f[Force — skip ping/DNS, try SSH immediately]'
-        -H '-H[Exact hostname — bypass fuzzy matching]:host:_hosts'
     )
     local flag
-    for flag in -j -c -p -u -v -n -f -H; do
+    for flag in -j -c -p -u -v -n -f; do
         # Only offer if not already present in the command line
         if (( ! ${used_flags[(Ie)${flag}]} )); then
             profile_opts+=("${all_profile_opts[$flag]}")
@@ -103,25 +102,13 @@ _ssh_complete() {
         local -a all_hosts all_descs
         local -A seen_hosts=()
 
-        # 1. Cache — profile-filtered first (highest priority + annotation)
-        while IFS=$'\t' read -r h desc; do
-            [[ -z "${h}" || -n "${seen_hosts[$h]}" ]] && continue
-            seen_hosts[$h]=1; all_hosts+=("${h}"); all_descs+=("${desc}")
-        done < <(_ssh_cache_hosts_annotated "${profile_flag_given}")
-
-        # 2. Cache — all other profiles
-        while IFS=$'\t' read -r h desc; do
-            [[ -z "${h}" || -n "${seen_hosts[$h]}" ]] && continue
-            seen_hosts[$h]=1; all_hosts+=("${h}"); all_descs+=("${desc}")
-        done < <(_ssh_cache_hosts_annotated)
-
-        # 3. ~/.ssh/config
+        # 1. ~/.ssh/config
         while IFS= read -r h; do
             [[ -n "${seen_hosts[$h]}" ]] && continue
             seen_hosts[$h]=1; all_hosts+=("${h}"); all_descs+=("(ssh/config)")
         done < <(_ssh_read_ssh_config_hosts)
 
-        # 4. ~/.ssh/known_hosts (mtime-cached)
+        # 2. ~/.ssh/known_hosts (mtime-cached)
         _ssh_complete_known_hosts
         for h in "${_SSH_KNOWN_HOSTS_CACHE[@]}"; do
             [[ -n "${seen_hosts[$h]}" ]] && continue
@@ -165,27 +152,6 @@ _ssh_complete() {
     fi
 }
 
-
-# ---------------------------------------------------------------------------
-# Completion for cache management commands
-# ---------------------------------------------------------------------------
-_ssh_cache_delete_complete() {
-    local -a hosts descs
-    local -A seen=()
-    while IFS=$'\t' read -r h desc; do
-        [[ -z "${h}" || -n "${seen[$h]}" ]] && continue
-        seen[$h]=1; hosts+=("${h}"); descs+=("${desc}")
-    done < <(_ssh_cache_hosts_annotated)
-    if (( ${#hosts[@]} > 0 )); then
-        local -a display_strs=()
-        local -i idx
-        for (( idx = 1; idx <= ${#hosts[@]}; idx++ )); do
-            display_strs+=("${descs[idx]}")
-        done
-        compadd -d display_strs -a hosts
-    fi
-}
-
 # ---------------------------------------------------------------------------
 # compdef registration — deferred if compinit hasn't run yet.
 #
@@ -196,7 +162,6 @@ _ssh_cache_delete_complete() {
 # ---------------------------------------------------------------------------
 _ssh_register_completions() {
     compdef _ssh_complete _ssh
-    compdef _ssh_cache_delete_complete _ssh_cache_delete
 }
 
 if (( ${+functions[compdef]} )); then

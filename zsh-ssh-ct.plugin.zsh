@@ -1,6 +1,5 @@
 # zsh-ssh-ct.plugin.zsh
-# Smart SSH wrapper with ChromaTerm (ct), fuzzy host matching, retry logic,
-# host/profile caching, and tab completion.
+# Smart SSH wrapper with ChromaTerm (ct), retry logic, and tab completion.
 #
 # zgenom:  zgenom load <user>/zsh-ssh-ct
 # Manual:  source /path/to/zsh-ssh-ct.plugin.zsh
@@ -24,11 +23,8 @@ typeset -g _SSH_PLUGIN_DIR="${0:A:h}"
 #   ──────────────────────────────────────────────────────────────────────────
 #   _SSH_CT_CONFIG_DIR     $XDG_CONFIG_HOME/chromaterm          ct YAML config dir
 #                          (~/.config/chromaterm if XDG unset)
-#   _SSH_CACHE_FILE        ~/.cache/zsh-ssh-ct/hosts            host cache path
 #   _SSH_MAX_RETRIES       60                                   max ping retries
 #   _SSH_RETRY_SLEEP       30                                   seconds between retries
-#   _SSH_CACHE_TTL_DAYS    30                                   cache entry TTL (0=forever)
-#   _SSH_FUZZY_CONFIRM     0                                    prompt before fuzzy connect
 #   _SSH_REMOTE_CMDS       $XDG_CONFIG_HOME/zsh-ssh-ct/init-com  init-commands YAML path
 #                          mands.yml
 #   _SSH_INIT_CMD_SKIP_    "u"                                   profiles to skip (j/c/p/u)
@@ -43,11 +39,8 @@ typeset -g _SSH_PLUGIN_DIR="${0:A:h}"
 # Resolve XDG_CONFIG_HOME with the spec-compliant fallback of ~/.config
 : "${XDG_CONFIG_HOME:=${HOME}/.config}"
 : "${_SSH_CT_CONFIG_DIR:=${XDG_CONFIG_HOME}/chromaterm}"
-: "${_SSH_CACHE_FILE:=${HOME}/.cache/zsh-ssh-ct/hosts}"
 : "${_SSH_MAX_RETRIES:=60}"
 : "${_SSH_RETRY_SLEEP:=30}"
-: "${_SSH_CACHE_TTL_DAYS:=30}"
-: "${_SSH_FUZZY_CONFIRM:=0}"
 : "${_SSH_REMOTE_CMDS:=${XDG_CONFIG_HOME}/zsh-ssh-ct/init-commands.yml}"
 : "${_SSH_INIT_CMD_SKIP_PROFILES:=u}"
 : "${_SSH_GHOSTTY_BG_ENABLE:=0}"
@@ -74,15 +67,11 @@ typeset -gA _SSH_PROFILE_NAMES=(
 )
 
 # ── Source sub-modules ───────────────────────────────────────────────────────
-source "${_SSH_PLUGIN_DIR}/lib/cache.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/ghostty.zsh"
 # shellcheck disable=SC1094
 source "${_SSH_PLUGIN_DIR}/lib/core.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/complete.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/init.zsh"
-
-# ── Auto-prune stale cache entries (at most once per day, runs in background) ─
-_ssh_cache_maybe_prune
 
 # ── Convenience aliases (uncomment to enable) ─────────────────────────────────
 # alias ssj='_ssh -j'

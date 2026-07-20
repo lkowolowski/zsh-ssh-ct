@@ -1,4 +1,4 @@
-# lib/core.zsh — Core _ssh() function, ping helper, fuzzy matcher, usage
+# lib/core.zsh — Core _ssh() function, ping helper, and usage
 #
 # shellcheck shell=bash
 # ─────────────────────────────────────────────────────────────────────────────
@@ -76,102 +76,6 @@ _ssh_read_ssh_config_hosts() {
 }
 
 # ---------------------------------------------------------------------------
-# Fuzzy host matching
-#
-# Collects candidate hostnames from /etc/hosts, ~/.ssh/known_hosts,
-# ~/.ssh/config, and the host cache, scores them against the query, and
-# prints the best match.  Returns 0 if a real match was found (score > 2),
-# 1 if the original query is returned unchanged.
-#
-# Called ONCE — callers capture both stdout and return code together:
-#
-#   local result rc
-#   result="$(_ssh_fuzzy_match "${query}")"
-#   rc=$?
-# ---------------------------------------------------------------------------
-_ssh_fuzzy_match() {
-    local query="${1}"
-    local -a candidates
-
-    # 1. Gather candidates ──────────────────────────────────────────────────
-
-    # /etc/hosts (skip comments and blank lines)
-    if [[ -r /etc/hosts ]]; then
-        while IFS= read -r line; do
-            [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-            [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
-            local fields=( ${=line} )
-            for f in "${fields[@]:1}"; do
-                [[ -n "${f}" ]] && candidates+=("${f}")
-            done
-        done < /etc/hosts
-    fi
-
-    # ~/.ssh/known_hosts (skip hashed entries)
-    while IFS= read -r h; do
-        candidates+=("${h}")
-    done < <(_ssh_read_known_hosts)
-
-    # ~/.ssh/config Host entries (skip wildcards)
-    while IFS= read -r h; do
-        candidates+=("${h}")
-    done < <(_ssh_read_ssh_config_hosts)
-
-    # Host cache
-    while IFS= read -r cached; do
-        [[ -n "${cached}" ]] && candidates+=("${cached}")
-    done < <(_ssh_cache_hosts)
-
-    # 2. Deduplicate ────────────────────────────────────────────────────────
-    local -aU unique_candidates=( "${candidates[@]}" )
-
-    # 3. Score ──────────────────────────────────────────────────────────────
-    # +15  verbatim substring match
-    # +5   prefix match
-    # +1   per sequential character match (fuzzy)
-    # Minimum winning score: 3  (must beat threshold of 2)
-    local best_host="${query}"
-    local -i best_score=2
-
-    local lc_query="${query:l}"
-    local -i qlen=${#lc_query}
-
-    local candidate lc_candidate
-    local -i score ci qi clen
-
-    for candidate in "${unique_candidates[@]}"; do
-        lc_candidate="${candidate:l}"
-        score=0
-
-        [[ "${lc_candidate}" == *"${lc_query}"* ]] && (( score += 15 ))
-        [[ "${lc_candidate}" == "${lc_query}"*  ]] && (( score += 5  ))
-
-        # Sequential character scan
-        ci=0; qi=0
-        clen=${#lc_candidate}
-        while (( qi < qlen && ci < clen )); do
-            [[ "${lc_candidate[ci+1]}" == "${lc_query[qi+1]}" ]] && (( qi++ ))
-            (( ci++ ))
-        done
-        # Sequential match only counts if all query chars were consumed AND
-        # no substring bonus already awarded
-        if (( qi < qlen && score < 15 )); then
-            score=0
-        elif (( qi == qlen && score < 15 )); then
-            (( score += qi ))
-        fi
-
-        if (( score > best_score )); then
-            best_score=score
-            best_host="${candidate}"
-        fi
-    done
-
-    print -- "${best_host}"
-    (( best_score > 2 ))   # return code: 0 = real match, 1 = no match
-}
-
-# ---------------------------------------------------------------------------
 # Usage / help
 # ---------------------------------------------------------------------------
 _ssh_usage() {
@@ -187,7 +91,6 @@ Profiles:
   -u  Unix / Linux   (ct -c ${_SSH_CT_CONFIG_DIR}/unix.yml)
 
 Options:
-  -H <host>  Exact hostname — bypass fuzzy matching entirely
   -v         Pass verbose flag to ssh
   -n         Dry run — print the resolved command without executing
   -f         Force — skip ping/DNS checks, try SSH immediately
@@ -198,22 +101,11 @@ Examples:
   _ssh -u web-server "uname -a"
   _ssh -p fw-01 -v
   _ssh -j rtr -n
-  _ssh -j -H core-rtr-01          # skip fuzzy matching
-
-Cache management:
-  _ssh_cache_show                  Pretty-print the cache table
-  _ssh_cache_clear                 Remove all cached entries
-  _ssh_cache_prune                 Remove entries older than TTL
-  _ssh_cache_delete <host>         Remove a specific host from cache
-  _ssh_cache_delete <host> <prof>  Remove a specific host:profile pair
 
 Configuration (set in .zshrc before loading):
   _SSH_CT_CONFIG_DIR          Config dir         (current: ${_SSH_CT_CONFIG_DIR})
-  _SSH_CACHE_FILE             Cache path         (current: ${_SSH_CACHE_FILE})
   _SSH_MAX_RETRIES            Max retries        (current: ${_SSH_MAX_RETRIES})
   _SSH_RETRY_SLEEP            Retry delay        (current: ${_SSH_RETRY_SLEEP}s)
-  _SSH_CACHE_TTL_DAYS         Cache TTL          (current: ${_SSH_CACHE_TTL_DAYS}d, 0=forever)
-  _SSH_FUZZY_CONFIRM          Confirm fuzzy      (current: ${_SSH_FUZZY_CONFIRM})
   _SSH_REMOTE_CMDS            Init-cmds YAML     (current: ${_SSH_REMOTE_CMDS})
   _SSH_INIT_CMD_SKIP_PROFILES Init-cmd skip      (current: ${_SSH_INIT_CMD_SKIP_PROFILES})
 EOF
@@ -264,7 +156,7 @@ _ssh() {
     command -v ct &>/dev/null && ct_available=1
 
     # ── Parse arguments ───────────────────────────────────────────────────────
-    local profile_flag="" verbose_flag="" exact_host="" dry_run=0 force_flag=0
+    local profile_flag="" verbose_flag="" dry_run=0 force_flag=0
     local host=""
     local -a remote_cmd args=( "$@" )
     local -i i=0 nargs=${#args[@]}
@@ -278,10 +170,6 @@ _ssh() {
                     return 1
                 fi
                 profile_flag="${arg#-}"
-                ;;
-            -H)
-                (( i++ ))
-                exact_host="${args[i+1]}"
                 ;;
             -v) verbose_flag="-v" ;;
             -n) dry_run=1 ;;
@@ -308,13 +196,10 @@ _ssh() {
         echo "[_ssh] Error: a profile flag (-j, -c, -p, -u) is required." >&2
         _ssh_usage; return 1
     fi
-    if [[ -z "${host}" && -z "${exact_host}" ]]; then
+    if [[ -z "${host}" ]]; then
         echo "[_ssh] Error: no host specified." >&2
         _ssh_usage; return 1
     fi
-    # -H overrides positional host
-    [[ -n "${exact_host}" ]] && host="${exact_host}"
-
     # ── Split user@host — preserve full string for ssh, extract host for ping ──
     # Handles: host, user@host, user:password@host, user:port@host
     # The ssh_target is passed to ssh as-is; ping_host is used for DNS/ping/fuzzy.
@@ -340,49 +225,13 @@ _ssh() {
         fi
     fi
 
-    # ── Detect bare IP addresses — treat like -H (skip fuzzy matching) ───────
-    local ipv4_regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-    local ipv6_regex='^[0-9a-fA-F:]+:[0-9a-fA-F:]*$'
-    if [[ -z "${exact_host}" && ( "${ping_host}" =~ ${ipv4_regex} || "${ping_host}" =~ ${ipv6_regex} ) ]]; then
-        exact_host="${ping_host}"
-    fi
+    local resolved_host="${ping_host}"
 
-    # ── Fuzzy match on ping_host only (never on user@ prefix) ────────────────
-    local resolved_host fuzzy_matched=0
-
-    if [[ -n "${exact_host}" ]]; then
-        resolved_host="${exact_host}"
-    else
-        local _fuzzy_result
-        _fuzzy_result="$(_ssh_fuzzy_match "${ping_host}")"
-        local _fuzzy_rc=$?
-        if (( _fuzzy_rc == 0 )) && [[ "${_fuzzy_result}" != "${ping_host}" ]]; then
-            resolved_host="${_fuzzy_result}"
-            fuzzy_matched=1
-        else
-            resolved_host="${ping_host}"
-        fi
-    fi
-
-    # Rebuild ssh_target with resolved host, preserving any user@ prefix
     if [[ "${host}" == *@* ]]; then
         local user_prefix="${host%@*}@"
         ssh_target="${user_prefix}${resolved_host}"
     else
         ssh_target="${resolved_host}"
-    fi
-
-    if (( fuzzy_matched )); then
-        echo "[_ssh] Fuzzy matched '${ping_host}' → '${resolved_host}'"
-        if (( _SSH_FUZZY_CONFIRM )); then
-            printf '[_ssh] Connect to %s? [Y/n] ' "${ssh_target}"
-            local reply
-            read -r reply </dev/tty
-            # shellcheck disable=SC2299
-            case "${reply:l}" in
-                n|no) echo "[_ssh] Aborted."; return 1 ;;
-            esac
-        fi
     fi
 
     # ── Show resolved ct config path ──────────────────────────────────────────
@@ -422,7 +271,6 @@ _ssh() {
     # ── Force mode: skip ping / DNS, try SSH immediately ─────────────────────
     if (( force_flag )); then
         printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}  |  force\n"
-        _ssh_cache_add "${resolved_host}" "${profile_flag}"
         if (( ${#ct_cmd[@]} > 0 )); then
             "${ct_cmd[@]}" "${ssh_cmd[@]}"
         else
@@ -442,8 +290,8 @@ _ssh() {
     # Print the initial status line without a newline
     printf '%s%s' "${clreol}" "${status_prefix}"
 
-    # ── DNS check — skip for IPs, fatal for hostnames ──────────────────────
-    if [[ -z "${exact_host}" ]] && ! _ssh_resolves "${resolved_host}"; then
+    # ── DNS check — fatal if hostname doesn't resolve ──────────────────────
+    if ! _ssh_resolves "${resolved_host}"; then
         printf '\n'
         echo "[_ssh] Error: '${resolved_host}' does not resolve. Check the hostname or DNS." >&2
         return 1
@@ -456,7 +304,6 @@ _ssh() {
         if _ssh_ping "${resolved_host}"; then
             printf '\r%s\n' "${clreol}"
             printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}\n"
-            _ssh_cache_add "${resolved_host}" "${profile_flag}"
 
             # Try init-commands first (replaces normal SSH if commands found)
             local -i init_exit

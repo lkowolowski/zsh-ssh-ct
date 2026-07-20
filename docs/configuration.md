@@ -7,11 +7,8 @@ Set any of these in your `.zshrc` **before** the `source` / `zgenom load` line.
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `_SSH_CT_CONFIG_DIR` | `$XDG_CONFIG_HOME/chromaterm` (~/.config/chromaterm) | Directory with ct YAML highlight configs |
-| `_SSH_CACHE_FILE` | `~/.cache/zsh-ssh-ct/hosts` | Host cache file path |
 | `_SSH_MAX_RETRIES` | `60` | Maximum ping retry iterations |
 | `_SSH_RETRY_SLEEP` | `30` | Seconds between retry attempts |
-| `_SSH_CACHE_TTL_DAYS` | `30` | Days before cache entries expire (0 = forever) |
-| `_SSH_FUZZY_CONFIRM` | `0` | Set to `1` to prompt before fuzzy-matched connections |
 
 ## Init-commands variables
 
@@ -40,8 +37,6 @@ See [docs/ghostty-bg.md](ghostty-bg.md) for color resolution order and save/rest
 ```zsh
 # Overrides — must precede the source/load line
 export _SSH_CT_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/chromaterm"
-export _SSH_CACHE_TTL_DAYS=7
-export _SSH_FUZZY_CONFIRM=1
 export _SSH_MAX_RETRIES=10
 export _SSH_RETRY_SLEEP=15
 

@@ -17,27 +17,15 @@ highlight config and (optionally) the Ghostty background color.
 ```zsh
 _ssh -j core-router        # plain hostname
 _ssh -j admin@core-router  # user@host
-_ssh -j -H core-rtr-01     # -H bypasses fuzzy matching entirely
+_ssh -j admin@core-router  # user@host
 ```
 
 Hostnames can include a `user@` prefix — it is preserved and passed to SSH.
-
-### Bare IP addresses
-
-If you pass a raw IPv4 or IPv6 address instead of a hostname, the plugin
-automatically treats it as an **exact host** (same as `-H`) and skips fuzzy
-matching. No configuration needed.
-
-```zsh
-_ssh -j 192.168.1.1          # IPv4 — treated as exact
-_ssh -c 2001:db8::1          # IPv6 — treated as exact
-```
 
 ## Flags
 
 | Flag | Description |
 | ---- | ----------- |
-| `-H <host>` | Exact hostname — skip DNS/ping/fuzzy, use verbatim |
 | `-v` | Verbose — forwarded to `ssh` as `-v` |
 | `-n` | Dry run — print the resolved command without executing |
 | `-f` | Force — skip ping/DNS checks, try SSH immediately |
@@ -93,30 +81,6 @@ The plugin looks for a profile-specific YAML in `_SSH_CT_CONFIG_DIR` (e.g.
 `generic.yml`. If neither exists, `ct` runs with its default config (no
 device-specific highlighting).
 
-## Fuzzy host matching
-
-When you type a partial hostname, the plugin scores candidates from four sources:
-
-| Priority | Source | Example match |
-| -------- | ------ | ------------- |
-| 1 | Host cache (profile-filtered) | Previous `-j` connections |
-| 2 | Host cache (all profiles) | Previous connections to any profile |
-| 3 | `~/.ssh/config` | `Host` entries |
-| 4 | `~/.ssh/known_hosts` | Parsed (hashed entries skipped) |
-
-`_ssh -j core` might resolve to `core-rtr-01` if that's the highest-scoring
-candidate.
-
-### Fuzzy confirmation prompt
-
-Set `_SSH_FUZZY_CONFIRM=1` to be prompted before connecting to a fuzzy-matched
-host:
-
-```text
-[_ssh] Fuzzy matched 'core' → 'core-rtr-01'
-[_ssh] Connect to core-rtr-01? [Y/n]
-```
-
 ## Retry loop
 
 When a host doesn't respond to ping, the plugin enters a retry loop:
@@ -155,11 +119,10 @@ core-switch       (Juniper)
 backup-router     (ssh/config)
 ```
 
-Completion candidates come from four tiers in this order:
+Completion candidates come from these sources:
 
-1. Host cache — matching profile first, then all profiles
-2. `~/.ssh/config` — `Host` entries
-3. `~/.ssh/known_hosts` — non-hashed entries (parsed once, cached by mtime)
+1. `~/.ssh/config` — `Host` entries
+2. `~/.ssh/known_hosts` — non-hashed entries (parsed once, cached by mtime)
 
 ### Profile-aware remote commands
 
@@ -177,7 +140,3 @@ The plugin registers completions via `compdef`. If `compinit` hasn't run yet
 at source time, a `precmd` hook fires on the first prompt to register them,
 then removes itself. This means you can source the plugin **before or after**
 `compinit`.
-
-### Cache management completion
-
-`_ssh_cache_delete <Tab>` completes hostnames from the cache with annotations.
