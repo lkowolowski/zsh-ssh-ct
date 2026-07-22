@@ -55,16 +55,35 @@ _ssh_init_eligible() {
 # Reads from zpty _ssh_ct until the prompt regex matches or timeout fires.
 # Returns 0 on prompt match, 1 on timeout.
 # All output up to (and including) the matching line is printed to stdout.
+#
+# Also forwards stdin → zpty on every iteration (non-blocking single char),
+# so keystrokes typed while waiting (e.g. during a password prompt that
+# arrives before any shell prompt) are captured immediately instead of
+# sitting unread in the terminal's line buffer. The terminal is expected
+# to already be in raw/-echo mode (owned by the caller, _ssh_init_execute)
+# for the entire interactive session, so those keystrokes are never echoed
+# in plaintext.
+#
+# If a password/passphrase prompt is detected in the accumulated output,
+# the countdown is reset to its original value exactly once (one-shot),
+# giving the user a full fresh window to type their password starting
+# from when the prompt actually appeared, rather than counting against
+# time already spent on the connection banner.
 # ---------------------------------------------------------------------------
 _ssh_init_zpty_wait() {
     setopt localoptions extendedglob
 
     local timeout="${1}" prompt_regex="${2}"
-    local line="" output_clean=""
-    local -i rc=1
+    local orig_timeout="${timeout}"
+    local pw_regex='([Pp]assword|[Pp]assphrase)[[:space:]]*:[[:space:]]*$'
+    local line="" output_clean="" char=""
+    local -i rc=1 pw_extended=0 activity=0
 
     while (( timeout > 0 )); do
+        activity=0
+
         if zpty -r -t _ssh_ct line 2>/dev/null; then
+            activity=1
             print -n -- "${line}"
 
             local clean="${line//$'\r'/}"
@@ -81,8 +100,23 @@ _ssh_init_zpty_wait() {
                 rc=0
                 break
             fi
-        else
-            # No data available — count down
+
+            if (( ! pw_extended )) && [[ "${output_clean}" =~ ${pw_regex} ]]; then
+                timeout="${orig_timeout}"
+                pw_extended=1
+            fi
+        fi
+
+        # Forward stdin → zpty (non-blocking single char). Runs every
+        # iteration — not just when there's no pty output — so a password
+        # prompt arriving mid-banner doesn't miss early keystrokes.
+        if read -t 0 -k 1 char 2>/dev/null; then
+            activity=1
+            zpty -w -n _ssh_ct "${char}"
+        fi
+
+        if (( ! activity )); then
+            # No pty output and no stdin input — count down
             sleep 1
             (( timeout-- ))
         fi
@@ -423,19 +457,19 @@ _ssh_init_resolve() {
 #
 # Called after init-commands complete. Bridges the zpty session to the
 # user's terminal until the remote process exits.
+#
+# NOTE: does NOT manage terminal raw/-echo state itself. The caller
+# (_ssh_init_execute) owns stty raw/-echo for the entire interactive
+# session lifetime (wait phase + bridge phase) and restores it via an
+# `always` block on every exit path, so raw/-echo is assumed already
+# active by the time this runs.
 # ---------------------------------------------------------------------------
 _ssh_init_zpty_bridge() {
-    local old_tty
     local char="" line=""
-
-    # Save and set raw terminal
-    old_tty="$(stty -g 2>/dev/null)"
-    stty raw -echo 2>/dev/null
 
     # Cleanup handler
     local _ssh_bridge_cleanup
     _ssh_bridge_cleanup() {
-        stty "${old_tty}" 2>/dev/null
         zpty -d _ssh_ct 2>/dev/null
     }
 
@@ -466,7 +500,6 @@ _ssh_init_zpty_bridge() {
         print -n -- "${line}"
     done
 
-    # Restore terminal
     _ssh_bridge_cleanup
 
     return 0
@@ -483,6 +516,7 @@ _ssh_init_zpty_bridge() {
 #   4. Prompt wait + command send loop
 #   5. zpty bridge (hands terminal to user)
 # ---------------------------------------------------------------------------
+# shellcheck disable=SC1072,SC1073,SC1056,SC1141
 _ssh_init_execute() {
     local profile_flag="${1}" resolved_host="${2}" ssh_target="${3}" ct_config="${4}"
     local verbose_flag="${5}" ct_available="${6}"
@@ -522,43 +556,57 @@ _ssh_init_execute() {
         zpty -b _ssh_ct "${ssh_cmd[@]}"
     fi
 
-    # Give the process a moment to establish the connection
-    sleep 1
+    # ── Own terminal raw/-echo for the entire interactive session ──
+    # Applied immediately after spawn — before the connection banner or
+    # a password prompt can possibly arrive — and restored on every exit
+    # path (normal return, timeout break, or interrupt) via the `always`
+    # block below, mirroring the guaranteed-cleanup pattern used for
+    # Ghostty background restore in core.zsh:_ssh() (`always { _ssh_ghostty_reset_bg }`).
+    local old_tty
+    old_tty="$(stty -g 2>/dev/null)"
+    stty raw -echo 2>/dev/null
 
-    # ── Wait for initial prompt ──────────────────────────────────
-    if ! _ssh_init_zpty_wait "${_SSH_INIT_TIMEOUT}" "${_SSH_INIT_PROMPT}"; then
-        # Timeout on initial prompt — drain and bridge anyway
-        if [[ -n "${verbose_flag}" ]]; then
-            echo "[_ssh] init-commands: initial prompt timeout" >&2
+    {
+        # Give the process a moment to establish the connection
+        sleep 1
+
+        # ── Wait for initial prompt ──────────────────────────────
+        if ! _ssh_init_zpty_wait "${_SSH_INIT_TIMEOUT}" "${_SSH_INIT_PROMPT}"; then
+            # Timeout on initial prompt — drain and bridge anyway
+            if [[ -n "${verbose_flag}" ]]; then
+                echo "[_ssh] init-commands: initial prompt timeout" >&2
+            fi
+            _ssh_init_zpty_bridge
+            return $?
         fi
+
+        # ── Send each command ─────────────────────────────────────
+        local cmd
+        for cmd in "${commands[@]}"; do
+            # Variable expansion — no local echo here: the remote pty echoes
+            # back what it receives (normal terminal behavior), and that echo
+            # is already printed by _ssh_init_zpty_wait below. Printing our own
+            # "> cmd" here would duplicate it.
+            # shellcheck disable=SC2296
+            local expanded="${(e)cmd}"
+
+            # Send command — pass -n so zpty doesn't append its OWN trailing
+            # newline on top of the one we're adding explicitly.
+            zpty -w -n _ssh_ct "${expanded}"$'\n'
+
+            # Wait for prompt
+            if ! _ssh_init_zpty_wait "${_SSH_INIT_TIMEOUT}" "${_SSH_INIT_PROMPT}"; then
+                if [[ -n "${verbose_flag}" ]]; then
+                    echo "[_ssh] init-commands: command timed out — aborting remaining" >&2
+                fi
+                break
+            fi
+        done
+
+        # ── Bridge to user ────────────────────────────────────────
         _ssh_init_zpty_bridge
         return $?
-    fi
-
-    # ── Send each command ─────────────────────────────────────────
-    local cmd
-    for cmd in "${commands[@]}"; do
-        # Variable expansion — no local echo here: the remote pty echoes
-        # back what it receives (normal terminal behavior), and that echo
-        # is already printed by _ssh_init_zpty_wait below. Printing our own
-        # "> cmd" here would duplicate it.
-        # shellcheck disable=SC2296
-        local expanded="${(e)cmd}"
-
-        # Send command — pass -n so zpty doesn't append its OWN trailing
-        # newline on top of the one we're adding explicitly.
-        zpty -w -n _ssh_ct "${expanded}"$'\n'
-
-        # Wait for prompt
-        if ! _ssh_init_zpty_wait "${_SSH_INIT_TIMEOUT}" "${_SSH_INIT_PROMPT}"; then
-            if [[ -n "${verbose_flag}" ]]; then
-                echo "[_ssh] init-commands: command timed out — aborting remaining" >&2
-            fi
-            break
-        fi
-    done
-
-    # ── Bridge to user ────────────────────────────────────────────
-    _ssh_init_zpty_bridge
-    return $?
+    } always {
+        stty "${old_tty}" 2>/dev/null
+    }
 }

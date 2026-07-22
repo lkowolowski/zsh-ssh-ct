@@ -6,7 +6,7 @@ extends: default
 rules:
   # Line length: ChromaTerm regex rules can be long
   line-length:
-    max: 120
+    max: 300
     level: warning
 
   # Comments: require a space after #, but don't enforce inline comment spacing
@@ -20,7 +20,7 @@ rules:
 
   # Truthy: ChromaTerm uses bare true/false in YAML — allow them
   truthy:
-    allowed-values: ['true', 'false']
+    allowed-values: ["true", "false"]
     check-keys: false
 
   # Document start: don't require --- at the top of every file

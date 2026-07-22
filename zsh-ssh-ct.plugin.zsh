@@ -71,6 +71,7 @@ source "${_SSH_PLUGIN_DIR}/lib/ghostty.zsh"
 # shellcheck disable=SC1094
 source "${_SSH_PLUGIN_DIR}/lib/core.zsh"
 source "${_SSH_PLUGIN_DIR}/lib/complete.zsh"
+# shellcheck disable=SC1094
 source "${_SSH_PLUGIN_DIR}/lib/init.zsh"
 
 # ── Convenience aliases (uncomment to enable) ─────────────────────────────────
