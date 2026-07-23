@@ -195,6 +195,34 @@ _ssh_init_unquote() {
 }
 
 # ---------------------------------------------------------------------------
+# _ssh_init_parse_inline_commands  — parse a YAML flow-style command list
+# (e.g. commands: ["cmd-a", "cmd-b"], commands: ["none"], or commands: [])
+# into one command per line on stdout. Empty/whitespace-only items and an
+# empty list produce no output. Used so the documented inline sentinel
+# syntax (commands: ["none"]) is recognized the same way as the block-style
+# form (commands:\n  - "none").
+# ---------------------------------------------------------------------------
+_ssh_init_parse_inline_commands() {
+    local raw="${1}"
+    raw="${raw#\[}"
+    raw="${raw%\]}"
+    raw="$(_ssh_init_ltrim "${raw}")"
+    raw="$(_ssh_init_rtrim "${raw}")"
+    [[ -z "${raw}" ]] && return 0
+
+    local -a items
+    items=( "${(@s:,:)raw}" )
+
+    local item val
+    for item in "${items[@]}"; do
+        val="$(_ssh_init_ltrim "${item}")"
+        val="$(_ssh_init_rtrim "${val}")"
+        val="$(_ssh_init_unquote "${val}")"
+        [[ -n "${val}" ]] && print -r -- "${val}"
+    done
+}
+
+# ---------------------------------------------------------------------------
 # _ssh_init_resolve  — parse config and resolve commands for a profile+host
 #
 # Sets global vars:
@@ -311,7 +339,14 @@ _ssh_init_resolve() {
             def_val="$(_ssh_init_unquote "${def_val}")"
 
             if [[ "${def_key}" == "commands" ]]; then
-                in_commands=1
+                if [[ "${def_val}" == \[*\] ]]; then
+                    local inline_cmd
+                    while IFS= read -r inline_cmd; do
+                        default_cmds+=( "${inline_cmd}" )
+                    done < <(_ssh_init_parse_inline_commands "${def_val}")
+                else
+                    in_commands=1
+                fi
                 continue
             fi
 
@@ -346,7 +381,27 @@ _ssh_init_resolve() {
             val="$(_ssh_init_unquote "${val}")"
 
             if [[ "${key}" == "commands" ]]; then
-                in_commands=1
+                if [[ "${val}" == \[*\] ]]; then
+                    local inline_joined
+                    inline_joined="$(_ssh_init_parse_inline_commands "${val}")"
+                    if [[ -n "${inline_joined}" ]]; then
+                        if [[ -n "${active_host}" ]]; then
+                            if [[ -n "${host_cmd_map[$active_host]}" ]]; then
+                                host_cmd_map[$active_host]+="${cmd_sep}${inline_joined}"
+                            else
+                                host_cmd_map[$active_host]="${inline_joined}"
+                            fi
+                        elif [[ -n "${active_platform}" ]]; then
+                            if [[ -n "${platform_cmd_map[$active_platform]}" ]]; then
+                                platform_cmd_map[$active_platform]+="${cmd_sep}${inline_joined}"
+                            else
+                                platform_cmd_map[$active_platform]="${inline_joined}"
+                            fi
+                        fi
+                    fi
+                else
+                    in_commands=1
+                fi
                 continue
             fi
 

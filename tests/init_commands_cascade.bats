@@ -86,18 +86,12 @@ EOF
     [[ "$output" == *"commands=cmd-a|cmd-b|cmd-c"* ]]
 }
 
-@test "commands: [\"none\"] (documented inline sentinel) yields zero commands" {
-    # NOTE: the YAML parser only understands block-style `commands:\n  - "x"`
-    # lists. The inline flow-style `commands: ["none"]` syntax documented in
-    # docs/init-commands.md as the sentinel is silently ignored by the
-    # line-based parser (it never populates resolved_cmds with "none"), so
-    # the dedicated sentinel-detection branch in _ssh_init_resolve
-    # (`resolved_cmds == ("none")` -> return 1) is unreachable dead code for
-    # any config written in the documented syntax. The end-user-visible
-    # behavior is still correct only because _ssh_init_execute has its own
-    # independent `(( ${#commands[@]} > 0 )) || return 0` safety net — so
-    # zero commands are sent either way, but via return 0 + empty array
-    # here, NOT via the documented return 1 sentinel path.
+@test "commands: [\"none\"] inline flow-style triggers the sentinel (return 1)" {
+    # The YAML parser recognizes both inline flow-style commands: ["none"]
+    # (the syntax documented in docs/init-commands.md) and block-style
+    # commands:\n  - "none" — both populate resolved_cmds with exactly
+    # ("none"), which _ssh_init_resolve's sentinel check detects to skip
+    # init-commands entirely.
     cat > "${FIXTURE_DIR}/init.yml" <<'EOF'
 hosts:
   quiet-host:
@@ -106,11 +100,11 @@ EOF
     export _SSH_REMOTE_CMDS="${FIXTURE_DIR}/init.yml"
     run zsh_ssh_ct_eval "$(resolve_script u quiet-host)"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"exit=0"* ]]
+    [[ "$output" == *"exit=1"* ]]
     [ "${lines[-1]}" = "commands=" ]
 }
 
-@test "commands: [\"none\"] via block-style DOES trigger the documented sentinel (return 1)" {
+@test "commands: [\"none\"] block-style also triggers the sentinel (return 1)" {
     cat > "${FIXTURE_DIR}/init.yml" <<'EOF'
 hosts:
   quiet-host:
@@ -122,6 +116,18 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"exit=1"* ]]
     [ "${lines[-1]}" = "commands=" ]
+}
+
+@test "commands: [\"cmd-a\", \"cmd-b\"] inline flow-style resolves both commands" {
+    cat > "${FIXTURE_DIR}/init.yml" <<'EOF'
+defaults:
+  commands: ["cmd-a", "cmd-b"]
+EOF
+    export _SSH_REMOTE_CMDS="${FIXTURE_DIR}/init.yml"
+    run zsh_ssh_ct_eval "$(resolve_script j core-router)"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"exit=0"* ]]
+    [[ "$output" == *"commands=cmd-a|cmd-b"* ]]
 }
 
 @test "missing config file returns 1 with hardcoded defaults" {
