@@ -72,3 +72,13 @@ repos:
         entry: mise run lint
         pass_filenames: false
         always_run: true
+
+  # ── Bats test suite — delegated to mise ──────────────────────────────────
+  - repo: local
+    hooks:
+      - id: mise-bats
+        name: mise run bats
+        language: system
+        entry: mise run bats
+        pass_filenames: false
+        always_run: true

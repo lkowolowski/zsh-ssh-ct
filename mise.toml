@@ -5,6 +5,8 @@
 #   mise run zsh-check     zsh -n syntax check on all .zsh files
 #   mise run yamllint      yamllint on all .yml files
 #   mise run markdownlint  markdownlint on all .md files
+#   mise run bats          run bats test suite
+#   mise run test          run lint + bats
 #   mise run pre-commit    run all pre-commit hooks
 #   mise run install       copy profiles + create init-commands config
 
@@ -32,13 +34,17 @@ run = "yamllint -c .yamllint.yml $(find . -name '*.yml' -not -name '.pre-commit-
 description = "markdownlint on all .md files"
 run = "markdownlint --config .markdownlint.yml $(find . -name '*.md' -not -path './.git/*')"
 
+[tasks.bats]
+description = "Run bats test suite"
+run = "bats tests/"
+
 [tasks.pre-commit]
 description = "Run all pre-commit hooks against every file"
 run = "pre-commit run --all-files"
 
 [tasks.test]
-description = "Alias for lint"
-depends = ["lint"]
+description = "Run lint + bats"
+depends = ["lint", "bats"]
 
 [tasks.install]
 description = "Copy profiles to _SSH_CT_CONFIG_DIR and create init-commands config"
