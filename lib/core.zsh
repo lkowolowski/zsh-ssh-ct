@@ -202,7 +202,7 @@ _ssh() {
     fi
     # ── Split user@host — preserve full string for ssh, extract host for ping ──
     # Handles: host, user@host, user:password@host, user:port@host
-    # The ssh_target is passed to ssh as-is; ping_host is used for DNS/ping/fuzzy.
+    # The ssh_target is passed to ssh as-is; ping_host is used for DNS/ping.
     local ssh_target="${host}"
     local ping_host="${host}"
     if [[ "${host}" == *@* ]]; then
@@ -223,15 +223,6 @@ _ssh() {
         else
             echo "[_ssh] Warning: no ct config found. Using ct default." >&2
         fi
-    fi
-
-    local resolved_host="${ping_host}"
-
-    if [[ "${host}" == *@* ]]; then
-        local user_prefix="${host%@*}@"
-        ssh_target="${user_prefix}${resolved_host}"
-    else
-        ssh_target="${resolved_host}"
     fi
 
     # ── Show resolved ct config path ──────────────────────────────────────────
@@ -291,9 +282,9 @@ _ssh() {
     printf '%s%s' "${clreol}" "${status_prefix}"
 
     # ── DNS check — fatal if hostname doesn't resolve ──────────────────────
-    if ! _ssh_resolves "${resolved_host}"; then
+    if ! _ssh_resolves "${ping_host}"; then
         printf '\n'
-        echo "[_ssh] Error: '${resolved_host}' does not resolve. Check the hostname or DNS." >&2
+        echo "[_ssh] Error: '${ping_host}' does not resolve. Check the hostname or DNS." >&2
         return 1
     fi
 
@@ -301,13 +292,13 @@ _ssh() {
         (( attempt++ ))
 
         # ── Ping ───────────────────────────────────────────────────────────
-        if _ssh_ping "${resolved_host}"; then
+        if _ssh_ping "${ping_host}"; then
             printf '\r%s\n' "${clreol}"
             printf "[_ssh] ${green}✓${reset} ${ssh_target}  |  profile: ${profile_name}\n"
 
             # Try init-commands first (replaces normal SSH if commands found)
             local -i init_exit
-            _ssh_init_execute "${profile_flag}" "${resolved_host}" \
+            _ssh_init_execute "${profile_flag}" "${ping_host}" \
                 "${ssh_target}" "${ct_config}" "${verbose_flag:-}" \
                 "${ct_available}" "${remote_cmd[@]}"
             init_exit=$?
@@ -335,7 +326,7 @@ _ssh() {
 
         if (( attempt >= max_retries )); then
             printf '\n'
-            echo "[_ssh] Max retries (${max_retries}) reached. Host '${resolved_host}' unreachable." >&2
+            echo "[_ssh] Max retries (${max_retries}) reached. Host '${ping_host}' unreachable." >&2
             return 1
         fi
 

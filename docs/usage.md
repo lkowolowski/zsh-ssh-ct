@@ -17,7 +17,6 @@ highlight config and (optionally) the Ghostty background color.
 ```zsh
 _ssh -j core-router        # plain hostname
 _ssh -j admin@core-router  # user@host
-_ssh -j admin@core-router  # user@host
 ```
 
 Hostnames can include a `user@` prefix — it is preserved and passed to SSH.

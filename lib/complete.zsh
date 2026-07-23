@@ -1,4 +1,4 @@
-# lib/complete.zsh — Tab completion for _ssh and cache management commands
+# lib/complete.zsh — Tab completion for _ssh
 #
 # shellcheck shell=bash
 # ─────────────────────────────────────────────────────────────────────────────
