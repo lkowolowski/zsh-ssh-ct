@@ -13,7 +13,7 @@
 
 defaults:
   timeout: 5
-  prompt: '[>#$]'
+  prompt: "[>#$]"
   commands: []
 
 platforms:
@@ -21,20 +21,21 @@ platforms:
     prompt: '([>%]|\]\#)[[:space:]]*$'
     timeout: 10
     commands:
-      - "set cli screen-length 0"
+      - "set cli screen-length $(stty size | awk '{print $1}')"
+      - "set cli screen-width $(stty size | awk '{print $2}')"
       - "set cli timestamp"
   cisco:
-    prompt: '[#>]'
+    prompt: "[#>]"
     commands:
-      - "term length 0"
-      - "term width 0"
+      - "term length $(stty size | awk '{print $1}')"
+      - "term width $(stty size | awk '{print $2}')"
   panos:
-    prompt: '[>#$]'
+    prompt: "[>#$]"
     commands:
       - "set cli pager off"
       - "set session timeout 0"
   unix:
-    prompt: '[#$]'
+    prompt: "[#$]"
 
 # Customize per-host in ~/.config/zsh-ssh-ct/init-commands.yml:
 hosts: {}
