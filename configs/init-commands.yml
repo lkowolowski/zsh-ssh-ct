@@ -21,14 +21,14 @@ platforms:
     prompt: '([>%]|\]\#)[[:space:]]*$'
     timeout: 10
     commands:
-      - "set cli screen-length $(stty size | awk '{print $1}')"
-      - "set cli screen-width $(stty size | awk '{print $2}')"
+      - "set cli screen-length $(LINES)"
+      - "set cli screen-width $(COLUMNS)"
       - "set cli timestamp"
   cisco:
     prompt: "[#>]"
     commands:
-      - "term length $(stty size | awk '{print $1}')"
-      - "term width $(stty size | awk '{print $2}')"
+      - "term length $(LINES)"
+      - "term width $(COLUMNS)"
   panos:
     prompt: "[>#$]"
     commands:
