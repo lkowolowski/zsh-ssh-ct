@@ -22,22 +22,7 @@ _ssh_ping() {
 typeset -g _SSH_OS
 _SSH_OS="$(uname -s 2>/dev/null)"
 
-# ---------------------------------------------------------------------------
-# DNS resolution check (distinct from ping / ICMP reachability)
-# Returns 0 if the name resolves, 1 if DNS fails entirely.
-# ---------------------------------------------------------------------------
-_ssh_resolves() {
-    local host="${1}"
-    if   command -v host     &>/dev/null; then host     "${host}"       &>/dev/null && return 0
-    elif command -v nslookup &>/dev/null; then nslookup "${host}"       &>/dev/null && return 0
-    elif command -v getent   &>/dev/null; then getent hosts "${host}"   &>/dev/null && return 0
-    fi
-    # Last resort: 1-second TCP probe to port 22 (works when ICMP is blocked)
-    if command -v nc &>/dev/null; then
-        nc -z -w1 "${host}" 22 &>/dev/null && return 0
-    fi
-    return 1
-}
+
 
 # ---------------------------------------------------------------------------
 # Read known_hosts — prints one hostname per line to stdout.
@@ -280,13 +265,6 @@ _ssh() {
 
     # Print the initial status line without a newline
     printf '%s%s' "${clreol}" "${status_prefix}"
-
-    # ── DNS check — fatal if hostname doesn't resolve ──────────────────────
-    if ! _ssh_resolves "${ping_host}"; then
-        printf '\n'
-        echo "[_ssh] Error: '${ping_host}' does not resolve. Check the hostname or DNS." >&2
-        return 1
-    fi
 
     while (( attempt < max_retries )); do
         (( attempt++ ))
